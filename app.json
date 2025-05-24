@@ -17,7 +17,7 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.newfocusguard",
+      "package": "com.Focus.Guard",
       "googleServicesFile": "./google-services.json"
     },
     "web": {
