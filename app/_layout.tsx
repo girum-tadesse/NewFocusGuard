@@ -1,29 +1,28 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { Slot } from 'expo-router';
+import React from 'react';
+import { Text, View } from 'react-native';
 import 'react-native-reanimated';
+import { AuthProvider } from '../src/contexts/AuthContext';
 
-import { useColorScheme } from '@/hooks/useColorScheme';
+// TODO: Potentially manage a state here (e.g., with AsyncStorage or context)
+// to decide whether to show onboarding, auth, or main app.
+// For now, we'll always start with onboarding.
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
+  const [fontsLoaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
-  if (!loaded) {
-    // Async font loading only occurs in development.
-    return null;
+  if (!fontsLoaded) {
+    // Can show a more specific loading indicator or splash screen here
+    return <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}><Text>Loading fonts...</Text></View>;
   }
 
+  // The AuthProvider will handle its own loading state regarding auth status
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <AuthProvider>
+      <Slot />
+    </AuthProvider>
   );
 }
