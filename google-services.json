@@ -12,7 +12,20 @@
           "package_name": "com.newfocusguard"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "98798161418-njqgs67r5rlia087b52909pvreav1nff.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.newfocusguard",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "98798161418-egfl2ugqr1btkqi4fprgtf4jsfiavu7l.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDm5IeSj8MT-GE78WYWajIP12Zj71WQE-M"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "98798161418-egfl2ugqr1btkqi4fprgtf4jsfiavu7l.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

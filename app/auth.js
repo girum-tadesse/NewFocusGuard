@@ -1,15 +1,16 @@
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Button, Input, Text } from 'react-native-elements';
+import { Button, Icon, Input, Text } from 'react-native-elements';
 import { useAuth } from '../src/contexts/AuthContext';
 
 export default function AuthScreen() {
-  const { signIn } = useAuth();
+  const { signIn, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -26,9 +27,24 @@ export default function AuthScreen() {
         setError(result.error || 'Failed to sign in');
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      setError(err.message || 'An unexpected error occurred');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setIsGoogleLoading(true);
+    try {
+      const result = await signInWithGoogle();
+      if (!result.success) {
+        setError(result.error || 'Google Sign-In failed. Please try again.');
+      }
+    } catch (err) {
+      setError(err.message || 'An unexpected Google Sign-In error occurred');
+    } finally {
+      setIsGoogleLoading(false);
     }
   };
 
@@ -54,7 +70,7 @@ export default function AuthScreen() {
           autoCapitalize="none"
           keyboardType="email-address"
           leftIcon={{ type: 'material', name: 'email', color: '#1a73e8' }}
-          disabled={isLoading}
+          disabled={isLoading || isGoogleLoading}
         />
         <Input
           placeholder="Password"
@@ -65,7 +81,7 @@ export default function AuthScreen() {
           }}
           secureTextEntry
           leftIcon={{ type: 'material', name: 'lock', color: '#1a73e8' }}
-          disabled={isLoading}
+          disabled={isLoading || isGoogleLoading}
         />
         <Button
           title="Sign In"
@@ -74,8 +90,26 @@ export default function AuthScreen() {
           buttonStyle={styles.button}
           raised
           loading={isLoading}
-          disabled={isLoading}
+          disabled={isLoading || isGoogleLoading}
         />
+
+        <View style={styles.dividerContainer}>
+          <View style={styles.divider} />
+          <Text style={styles.dividerText}>OR</Text>
+          <View style={styles.divider} />
+        </View>
+
+        <Button
+          title="Sign in with Google"
+          onPress={handleGoogleSignIn}
+          icon={<Icon name="google" type="font-awesome" size={20} color="white" style={{ marginRight: 10 }}/>}
+          containerStyle={[styles.buttonContainer, { marginTop: 10 }]}
+          buttonStyle={styles.googleButton}
+          raised
+          loading={isGoogleLoading}
+          disabled={isLoading || isGoogleLoading}
+        />
+
       </View>
 
       <View style={styles.footer}>
@@ -85,7 +119,7 @@ export default function AuthScreen() {
           type="clear"
           titleStyle={{ color: '#1a73e8' }}
           onPress={() => router.push('/signup')}
-          disabled={isLoading}
+          disabled={isLoading || isGoogleLoading}
         />
       </View>
     </View>
@@ -95,48 +129,84 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f7f9fc',
     padding: 20,
+    justifyContent: 'center',
   },
   header: {
     alignItems: 'center',
-    marginTop: 60,
-    marginBottom: 40,
+    marginBottom: 30,
   },
   title: {
-    color: '#1a73e8',
-    marginBottom: 10,
+    color: '#2c3e50',
+    marginBottom: 8,
+    fontWeight: 'bold',
   },
   subtitle: {
     fontSize: 16,
     color: '#5f6368',
     textAlign: 'center',
+    paddingHorizontal: 20,
   },
   form: {
     marginBottom: 20,
+    backgroundColor: '#fff',
+    padding: 25,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   buttonContainer: {
-    marginTop: 20,
-    borderRadius: 30,
+    marginTop: 15,
+    borderRadius: 8,
   },
   button: {
     backgroundColor: '#1a73e8',
-    paddingVertical: 12,
-    borderRadius: 30,
+    paddingVertical: 14,
+    borderRadius: 8,
+  },
+  googleButton: {
+    backgroundColor: '#db4437',
+    paddingVertical: 14,
+    borderRadius: 8,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 30,
   },
   footerText: {
     color: '#5f6368',
-    marginRight: 10,
+    marginRight: 5,
+    fontSize: 15,
   },
   errorText: {
     color: '#d93025',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 15,
+    fontSize: 14,
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 25,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#dfe1e5',
+  },
+  dividerText: {
+    marginHorizontal: 10,
+    color: '#5f6368',
+    fontSize: 14,
+    fontWeight: '600',
   },
 }); 
