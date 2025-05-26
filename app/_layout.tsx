@@ -1,28 +1,70 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFonts } from 'expo-font';
-import { Slot } from 'expo-router';
-import React from 'react';
-import { Text, View } from 'react-native';
+import { Slot, SplashScreen, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import 'react-native-reanimated';
-import { AuthProvider } from '../src/contexts/AuthContext';
+import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 
-// TODO: Potentially manage a state here (e.g., with AsyncStorage or context)
-// to decide whether to show onboarding, auth, or main app.
-// For now, we'll always start with onboarding.
+const ONBOARDING_KEY = 'hasCompletedOnboarding';
 
-export default function RootLayout() {
+// Prevent the splash screen from auto-hiding before we are ready.
+SplashScreen.preventAutoHideAsync();
+
+function InitialLayout() {
   const [fontsLoaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+  const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null);
+  const router = useRouter();
+  const {isLoading: authIsLoading, user } = useAuth(); // Get auth state from context
 
-  if (!fontsLoaded) {
-    // Can show a more specific loading indicator or splash screen here
-    return <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}><Text>Loading fonts...</Text></View>;
+  useEffect(() => {
+    async function checkOnboardingStatus() {
+      try {
+        const value = await AsyncStorage.getItem(ONBOARDING_KEY);
+        setOnboardingCompleted(value === 'true');
+      } catch (e) {
+        // error reading value
+        setOnboardingCompleted(false); // Assume onboarding not done if error
+      }
+    }
+    checkOnboardingStatus();
+  }, []);
+
+  useEffect(() => {
+    if (fontsLoaded && onboardingCompleted !== null && !authIsLoading) {
+      SplashScreen.hideAsync(); // Hide splash screen now that we are ready
+      
+      if (onboardingCompleted === false) {
+        router.replace('/onboarding');
+      } else if (!user) {
+        // Onboarding is done, but user is not logged in, go to auth
+        // AuthProvider and Slot will handle showing /auth or /login from here if not authenticated
+        // Or, if your auth routes are outside the main Slot, you could do router.replace('/auth');
+        // For now, assuming Slot handles it based on AuthProvider state.
+        // If /auth is your login screen, and it's a top-level route, this is fine.
+      } else {
+        // Onboarding is done, user is logged in, go to main app (e.g., tabs)
+        // This will be handled by Slot if your (tabs) layout is the default for authenticated users
+      }
+    }
+  }, [fontsLoaded, onboardingCompleted, authIsLoading, user, router]);
+
+  if (!fontsLoaded || onboardingCompleted === null || authIsLoading) {
+    // Show nothing or a minimal loading component until checks are done 
+    // and SplashScreen.hideAsync() is called.
+    return null; 
   }
 
-  // The AuthProvider will handle its own loading state regarding auth status
+  // If onboardingCompleted is true, AuthProvider and Slot will handle auth checks and navigation
+  // If onboardingCompleted was false, we would have already redirected to /onboarding
+  return <Slot />;
+}
+
+export default function RootLayout() {
   return (
     <AuthProvider>
-      <Slot />
+      <InitialLayout />
     </AuthProvider>
   );
 }

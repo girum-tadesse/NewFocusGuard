@@ -1,4 +1,4 @@
-package com.Focus.Guard
+package com.newfocusguard
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

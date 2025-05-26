@@ -1,9 +1,9 @@
 // app/firebase/config.d.ts
 
 // Import types from the 'firebase' package (modular Web SDK)
+import { FirebaseApp } from '@react-native-firebase/app';
 import { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
-import { FirebaseApp } from 'firebase/app';
 import { Auth } from 'firebase/auth'; // User can be used for getCurrentUser and signUp/signIn results
 import { Firestore } from 'firebase/firestore';
 
@@ -38,6 +38,6 @@ interface FirestoreResult {
 
 export interface FirestoreDBHelpers {
   getUserProfile: (userId: string) => Promise<FirestoreResult>;
-  updateUserProfile: (userId: string, data: any) => Promise<{ success: boolean; error?: string }>;
+  updateUserProfile: (userId: string, data: FirebaseFirestoreTypes.DocumentData | { [key: string]: any }) => Promise<{ success: boolean; error?: string }>;
 }
 export const firestoreDB: FirestoreDBHelpers; 

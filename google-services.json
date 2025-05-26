@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:98798161418:android:19e7fa0726155d580819f3",
+        "mobilesdk_app_id": "1:98798161418:android:ff9cfd51e4a5aed90819f3",
         "android_client_info": {
-          "package_name": "com.Focus.Guard"
+          "package_name": "com.newfocusguard"
         }
       },
       "oauth_client": [],

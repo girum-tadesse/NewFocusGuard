@@ -1,4 +1,4 @@
-package com.Focus.Guard
+package com.newfocusguard
 
 import android.app.Application
 import android.content.res.Configuration

@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.Focus.Guard'
+    namespace 'com.newfocusguard'
     defaultConfig {
-        applicationId 'com.Focus.Guard'
+        applicationId 'com.newfocusguard'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
