@@ -2,33 +2,37 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useRef, useState } from 'react';
-import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+    Animated,
+    Dimensions,
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
 import PagerView from 'react-native-pager-view';
 
 const ONBOARDING_KEY = 'hasCompletedOnboarding';
-const TOTAL_PAGES = 3; // Updated to 3 pages
+const TOTAL_PAGES = 3;
+const { width } = Dimensions.get('window');
 
 interface OnboardingPageProps {
-  imagePlaceholder?: boolean; // To indicate if an image placeholder should be shown
   title: string;
   description: string;
   children?: React.ReactNode;
 }
 
-const OnboardingPage: React.FC<OnboardingPageProps> = ({ imagePlaceholder, title, description, children }) => (
-  <View style={styles.page}>
-    {imagePlaceholder && (
-      <View style={styles.imagePlaceholder}>
-        <Text style={styles.imagePlaceholderText}>[Image Placeholder]</Text>
-      </View>
-    )}
-    <Text style={styles.title}>{title}</Text>
-    <Text style={styles.description}>{description}</Text>
-    {children}
-  </View>
+const OnboardingPage: React.FC<OnboardingPageProps> = ({ title, description, children }) => (
+  <Animated.View style={styles.page}>
+    <View style={styles.contentContainer}>
+      <Text style={styles.title}>{title}</Text>
+      <Text style={styles.description} numberOfLines={2}>{description}</Text>
+      {children}
+    </View>
+  </Animated.View>
 );
 
-// Define the event type for onPageSelected more simply
 interface PagerViewOnPageSelectedEventData {
   nativeEvent: {
     position: number;
@@ -39,73 +43,93 @@ export default function OnboardingScreen() {
   const router = useRouter();
   const pagerViewRef = useRef<PagerView>(null);
   const [currentPage, setCurrentPage] = useState(0);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   const handleOnboardingComplete = async () => {
+    console.log('[Onboarding] Get Started button pressed');
     try {
+      console.log('[Onboarding] Attempting to set AsyncStorage item...');
       await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+      console.log('[Onboarding] AsyncStorage item set successfully.');
+      console.log('[Onboarding] Navigating to /auth...');
       router.replace('/auth');
     } catch (error) {
-      console.error('Failed to save onboarding status', error);
-      router.replace('/auth');
+      console.error('[Onboarding] Error during onboarding completion:', error);
+      console.log('[Onboarding] Navigating to /auth (from catch block)...');
+      router.replace('/auth'); // Attempt navigation even if AsyncStorage fails
     }
   };
 
   const onPageSelected = (event: PagerViewOnPageSelectedEventData) => {
+    Animated.sequence([
+      Animated.timing(fadeAnim, {
+        toValue: 0.5,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
     setCurrentPage(event.nativeEvent.position);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
-      <PagerView 
-        ref={pagerViewRef}
-        style={styles.pagerView} 
-        initialPage={0}
-        onPageSelected={onPageSelected}
-      >
-        <View key="1">
-          <OnboardingPage
-            imagePlaceholder
-            title="Instant App Control"
-            description="Lock away distractions with a single tap. Create your ideal focus environment anytime, anywhere."
-          />
-        </View>
-        <View key="2">
-          <OnboardingPage
-            imagePlaceholder
-            title="Plan Your Productive Hours"
-            description="Schedule app locks in advance. Align your digital habits with your daily goals and routines seamlessly."
-          />
-        </View>
-        <View key="3">
-          <OnboardingPage
-            imagePlaceholder
-            title="AI-Powered Guidance"
-            description="Coming soon: An intelligent assistant to help you optimize focus, understand your patterns, and stay motivated."
-          />
-        </View>
-      </PagerView>
-
-      {/* Page Indicators */}
-      <View style={styles.indicatorContainer}>
-        {Array.from({ length: TOTAL_PAGES }).map((_, index) => (
-          <View
-            key={index}
-            style={[styles.indicator, currentPage === index ? styles.activeIndicator : {}]}
-          />
-        ))}
-      </View>
-
-      {/* Navigation Button Area - Single Button */}
-      <View style={styles.navigationButtonContainer}>
-        <TouchableOpacity 
-          style={styles.mainButton} 
-          onPress={handleOnboardingComplete}
+      <View style={styles.mainContainer}>
+        <PagerView 
+          ref={pagerViewRef}
+          style={styles.pagerView} 
+          initialPage={0}
+          onPageSelected={onPageSelected}
         >
-          <Text style={styles.mainButtonText}>
-            Get Started
-          </Text>
-        </TouchableOpacity>
+          <View key="1">
+            <OnboardingPage
+              title="Instant App Control"
+              description="Block distracting apps with a single tap to maintain your focus"
+            />
+          </View>
+          <View key="2">
+            <OnboardingPage
+              title="Plan Your Productive Hours"
+              description="Set up scheduled app locks to build lasting digital habits"
+            />
+          </View>
+          <View key="3">
+            <OnboardingPage
+              title="AI-Powered Guidance"
+              description="Receive smart insights to boost your daily productivity"
+            />
+          </View>
+        </PagerView>
+
+        <View style={styles.bottomContainer}>
+          <View style={styles.indicatorContainer}>
+            {Array.from({ length: TOTAL_PAGES }).map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.indicator,
+                  currentPage === index ? styles.activeIndicator : {},
+                ]}
+              />
+            ))}
+          </View>
+
+          <TouchableOpacity 
+            style={styles.mainButton} 
+            onPress={handleOnboardingComplete}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.mainButtonText}>
+              Get Started
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -114,86 +138,89 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF', // White background like example
+    backgroundColor: '#FFF9F5',
+  },
+  mainContainer: {
+    flex: 1,
+    backgroundColor: '#FFF9F5',
   },
   pagerView: {
     flex: 1,
   },
   page: {
     flex: 1,
-    justifyContent: 'center', // Content will be centered, image at top, text below
-    alignItems: 'center',
-    paddingHorizontal: 40, // More horizontal padding for text content
+    backgroundColor: '#FFF9F5',
+    paddingHorizontal: 32,
   },
-  imagePlaceholder: {
-    width: '100%',
-    height: 250, // Adjust as needed
-    backgroundColor: '#E0E0E0', // Light grey placeholder
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 20, // Rounded corners for placeholder
-    marginBottom: 40, // Space between image and title
-  },
-  imagePlaceholderText: {
-    color: '#9E9E9E',
-    fontSize: 16,
+  contentContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingBottom: 100,
   },
   title: {
-    fontSize: 32, // Updated from 26
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '600',
     textAlign: 'center',
-    marginBottom: 15,
-    color: '#333333', // Darker text color
-    fontFamily: 'Helvetica', // Added Helvetica
+    marginBottom: 16,
+    color: '#2D2D2D',
+    letterSpacing: -0.5,
+    fontFamily: 'System',
+    paddingHorizontal: 10,
+    lineHeight: 36,
   },
   description: {
-    fontSize: 16, // Slightly larger description
+    fontSize: 14,
     textAlign: 'center',
-    color: '#999999', // Adjusted to a medium-light gray
-    lineHeight: 24,
-    marginBottom: 30, // Space before indicators/button
-    fontFamily: 'Helvetica', // Added Helvetica
+    color: '#B6B6B6',
+    lineHeight: 20,
+    marginBottom: 32,
+    paddingHorizontal: 40,
+    fontFamily: 'System',
+    fontWeight: '300',
+    textShadowColor: 'transparent',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 0,
+  },
+  bottomContainer: {
+    paddingHorizontal: 32,
+    paddingBottom: 32,
   },
   indicatorContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 20, // Space around indicators
+    marginBottom: 32,
   },
   indicator: {
-    height: 10,
-    width: 10,
-    borderRadius: 5,
-    backgroundColor: '#D1D1D1', // Inactive dot color
-    marginHorizontal: 5,
+    height: 8,
+    width: 8,
+    borderRadius: 4,
+    backgroundColor: '#E0E0E0',
+    marginHorizontal: 4,
   },
   activeIndicator: {
-    backgroundColor: '#FF7900', // Updated Active dot color
-    width: 12, // Slightly wider active dot
-    height: 12,
-    borderRadius: 6,
-  },
-  navigationButtonContainer: {
-    paddingHorizontal: 40,
-    paddingVertical: 20, // Padding for the button container
-    alignItems: 'center', // Center the button
+    backgroundColor: '#1A1A1A',
+    width: 24,
   },
   mainButton: {
-    backgroundColor: '#FF7900', // Updated Orange button color
-    paddingVertical: 12, 
-    paddingHorizontal: 40, // Increased from 25 for a bit more width
-    borderRadius: 30, 
+    backgroundColor: '#FF7757',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 3, 
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    shadowColor: '#FF7757',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+    alignSelf: 'center',
   },
   mainButtonText: {
-    color: '#FFFFFF', 
-    fontSize: 16, // Decreased from 18
-    fontFamily: 'Helvetica', 
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+    fontFamily: 'System',
   },
 }); 
