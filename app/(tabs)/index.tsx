@@ -1,12 +1,28 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Button, Platform, StyleSheet } from 'react-native';
 
 import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { useAuth } from '../../src/contexts/AuthContext';
+
+const ONBOARDING_KEY = 'hasCompletedOnboarding';
 
 export default function HomeScreen() {
+  const { signOut } = useAuth();
+
+  const handleResetAndSignOut = async () => {
+    try {
+      await signOut();
+      await AsyncStorage.removeItem(ONBOARDING_KEY);
+      // Navigation to onboarding should be handled by _layout.tsx due to auth state change
+    } catch (error) {
+      console.error('Error during reset and sign out:', error);
+    }
+  };
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
@@ -50,6 +66,9 @@ export default function HomeScreen() {
           <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
           <ThemedText type="defaultSemiBold">app-example</ThemedText>.
         </ThemedText>
+      </ThemedView>
+      <ThemedView style={styles.stepContainer}>
+        <Button title="Reset Onboarding & Sign Out (Dev)" onPress={handleResetAndSignOut} color="#FF3B30" />
       </ThemedView>
     </ParallaxScrollView>
   );

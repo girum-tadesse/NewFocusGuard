@@ -141,15 +141,30 @@ export const firebaseAuth = {
 
   signOut: async () => {
     try {
+      const currentUser = authInstance.currentUser; // Get Firebase user before signing out
       await firebaseSignOut(authInstance);
-      // Also sign out from Google if the user signed in with Google
-      if (await GoogleSignin.isSignedIn()) {
-        await GoogleSignin.revokeAccess();
-        await GoogleSignin.signOut();
+
+      // Attempt to sign out from Google if a Google user was previously signed in
+      const googleCurrentUser = await GoogleSignin.getCurrentUser();
+      if (googleCurrentUser) {
+        try {
+          await GoogleSignin.revokeAccess();
+          await GoogleSignin.signOut();
+          console.log('User signed out from Google.');
+        } catch (googleSignOutError) {
+          console.error('Google Sign out error:', googleSignOutError);
+          // Decide if this error should prevent the overall signOut from being successful
+          // For now, we'll let it be, as Firebase signOut was successful.
+        }
       }
       return { success: true };
     } catch (error) {
       console.error('Sign out error (RNFirebase Modular):', error);
+      // Check if it's the specific no-current-user error, which might be okay if Google sign out failed first
+      if (error.code === 'auth/no-current-user' && !(await GoogleSignin.getCurrentUser())) {
+         // If Firebase says no user and Google also has no user, consider it a success.
+         return { success: true };
+      }
       return { success: false, error: error.message || error.code };
     }
   },

@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFonts } from 'expo-font';
-import { Slot, SplashScreen, useRouter } from 'expo-router';
+import { Slot, SplashScreen, usePathname, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
@@ -16,6 +16,7 @@ function InitialLayout() {
   });
   const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null);
   const router = useRouter();
+  const pathname = usePathname(); // Get current pathname
   const {isLoading: authIsLoading, user } = useAuth(); // Get auth state from context
 
   useEffect(() => {
@@ -38,17 +39,23 @@ function InitialLayout() {
       if (onboardingCompleted === false) {
         router.replace('/onboarding');
       } else if (!user) {
-        // Onboarding is done, but user is not logged in, go to auth
-        // AuthProvider and Slot will handle showing /auth or /login from here if not authenticated
-        // Or, if your auth routes are outside the main Slot, you could do router.replace('/auth');
-        // For now, assuming Slot handles it based on AuthProvider state.
-        // If /auth is your login screen, and it's a top-level route, this is fine.
+        // Onboarding is done, but user is not logged in.
+        // Ensure we are on an auth-related screen or navigate to the main auth screen if not.
+        // Example: if current path isn't /auth, /login, or /signup, redirect to /auth
+        // This depends on how your auth routes are structured. For now, we assume user will manually navigate to signin/signup.
       } else {
-        // Onboarding is done, user is logged in, go to main app (e.g., tabs)
-        // This will be handled by Slot if your (tabs) layout is the default for authenticated users
+        // Onboarding is done, user is logged in.
+        // Explicitly navigate to the main part of the app if currently on an auth screen or onboarding.
+        const authRoutes = ['/auth', '/login', '/signup'];
+        const isOnAuthRoute = authRoutes.includes(pathname);
+        const isOnOnboardingRoute = pathname === '/onboarding';
+
+        if (isOnAuthRoute || isOnOnboardingRoute) {
+          router.replace('/(tabs)/'); // Or your main app route
+        }
       }
     }
-  }, [fontsLoaded, onboardingCompleted, authIsLoading, user, router]);
+  }, [fontsLoaded, onboardingCompleted, authIsLoading, user, router, pathname]);
 
   if (!fontsLoaded || onboardingCompleted === null || authIsLoading) {
     // Show nothing or a minimal loading component until checks are done 
