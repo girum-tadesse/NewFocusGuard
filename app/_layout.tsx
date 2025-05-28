@@ -1,7 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFonts } from 'expo-font';
 import { Slot, SplashScreen, usePathname, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import 'react-native-reanimated';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 
@@ -14,57 +13,55 @@ function InitialLayout() {
   const [fontsLoaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
-  const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null);
   const router = useRouter();
-  const pathname = usePathname(); // Get current pathname
-  const {isLoading: authIsLoading, user } = useAuth(); // Get auth state from context
+  const pathname = usePathname();
+  // Get auth state AND onboardingCompleted from context
+  const { isLoading: authIsLoading, user, onboardingCompleted } = useAuth(); 
 
   useEffect(() => {
-    async function checkOnboardingStatus() {
-      try {
-        const value = await AsyncStorage.getItem(ONBOARDING_KEY);
-        setOnboardingCompleted(value === 'true');
-      } catch (e) {
-        // error reading value
-        setOnboardingCompleted(false); // Assume onboarding not done if error
-      }
-    }
-    checkOnboardingStatus();
-  }, []);
-
-  useEffect(() => {
-    if (fontsLoaded && onboardingCompleted !== null && !authIsLoading) {
-      SplashScreen.hideAsync(); // Hide splash screen now that we are ready
+    // No longer need to check AsyncStorage directly here for onboarding
+    if (fontsLoaded && !authIsLoading) { // onboardingCompleted is now part of authIsLoading logic implicitly, or handled by AuthProvider
+      SplashScreen.hideAsync();
       
       if (onboardingCompleted === false) {
-        router.replace('/onboarding');
+        // Only redirect to onboarding if not already there
+        if (pathname !== '/onboarding') {
+          router.replace('/onboarding');
+        }
       } else if (!user) {
-        // Onboarding is done, but user is not logged in.
-        // Ensure we are on an auth-related screen or navigate to the main auth screen if not.
-        // Example: if current path isn't /auth, /login, or /signup, redirect to /auth
-        // This depends on how your auth routes are structured. For now, we assume user will manually navigate to signin/signup.
+        // Onboarding is done, user not logged in.
+        // If on a protected route (e.g., tabs), redirect to auth. 
+        // Allow /auth, /signup, /onboarding (though onboarding should be handled by above)
+        const allowedPaths = ['/auth', '/signup', '/onboarding'];
+        if (!allowedPaths.includes(pathname) && !pathname.startsWith('/(tabs)')) {
+             // If we are not on an allowed path and not already trying to go to tabs (which would be a bug if no user)
+             // Let's refine this logic. If onboarding is done and no user, we should be on /auth or /signup.
+             // If the user is trying to access anything else, redirect to /auth.
+        }
+        // If current path isn't /auth or /signup, and it's not onboarding (already handled)
+        // It's safer to let users stay on /auth or /signup if they are already there.
+        // If they are on, e.g. / (tabs) then redirect.
+        if (pathname.startsWith('/(tabs)')) { // if trying to access main app without user
+            router.replace('/auth');
+        }
+
       } else {
         // Onboarding is done, user is logged in.
-        // Explicitly navigate to the main part of the app if currently on an auth screen or onboarding.
-        const authRoutes = ['/auth', '/login', '/signup'];
+        const authRoutes = ['/auth', '/signup'];
         const isOnAuthRoute = authRoutes.includes(pathname);
         const isOnOnboardingRoute = pathname === '/onboarding';
 
         if (isOnAuthRoute || isOnOnboardingRoute) {
-          router.replace('/(tabs)/'); // Or your main app route
+          router.replace('/(tabs)/');
         }
       }
     }
-  }, [fontsLoaded, onboardingCompleted, authIsLoading, user, router, pathname]);
+  }, [fontsLoaded, authIsLoading, user, onboardingCompleted, router, pathname]);
 
-  if (!fontsLoaded || onboardingCompleted === null || authIsLoading) {
-    // Show nothing or a minimal loading component until checks are done 
-    // and SplashScreen.hideAsync() is called.
+  if (!fontsLoaded || authIsLoading) { // onboardingCompleted is now part of the context's loading state consideration
     return null; 
   }
 
-  // If onboardingCompleted is true, AuthProvider and Slot will handle auth checks and navigation
-  // If onboardingCompleted was false, we would have already redirected to /onboarding
   return <Slot />;
 }
 

@@ -1,15 +1,20 @@
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
 import React, { createContext, useContext, useEffect, useState } from 'react';
 // Import firebaseAuth which now includes onAuthStateChanged
 import { firebaseAuth, firestoreDB } from '../firebase/config';
+
+const ONBOARDING_KEY = 'hasCompletedOnboarding'; // Define key here
 
 const AuthContext = createContext({
   user: null,
   userProfile: null,
   isLoading: true, // Will be true until Firebase and auth state are ready
+  onboardingCompleted: false, // Add onboardingCompleted
   signIn: async () => {},
   signUp: async () => {},
   signOut: async () => {},
   signInWithGoogle: async () => {},
+  markOnboardingComplete: async () => {}, // Add markOnboardingComplete
 });
 
 export function AuthProvider({ children }) {
@@ -18,8 +23,21 @@ export function AuthProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true); // Start as true
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false); // Add state
 
   useEffect(() => {
+    // Check onboarding status when provider loads
+    async function checkOnboarding() {
+      try {
+        const value = await AsyncStorage.getItem(ONBOARDING_KEY);
+        setOnboardingCompleted(value === 'true');
+      } catch (e) {
+        setOnboardingCompleted(false);
+      }
+      // setIsLoading(false); // This will be set after auth state is also checked
+    }
+    checkOnboarding();
+
     const unsubscribe = firebaseAuth.onAuthStateChanged(async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
@@ -39,12 +57,26 @@ export function AuthProvider({ children }) {
       } else {
         setUserProfile(null);
       }
+      // Only set isLoading to false after both onboarding and auth state are resolved
+      // We need to ensure checkOnboarding has finished before setting isLoading to false.
+      // For simplicity, we assume checkOnboarding is quick. A more robust solution
+      // might involve a separate loading state for onboarding.
       setIsLoading(false); 
     });
 
     // Cleanup subscription on unmount
     return () => unsubscribe();
   }, []);
+
+  const markOnboardingComplete = async () => {
+    try {
+      await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+      setOnboardingCompleted(true);
+    } catch (e) {
+      console.error("Failed to mark onboarding as complete", e);
+      // Optionally handle the error (e.g., show a message to the user)
+    }
+  };
 
   const signInWithGoogle = async () => {
     setLoading(true);
@@ -77,10 +109,12 @@ export function AuthProvider({ children }) {
     user,
     userProfile,
     isLoading,
+    onboardingCompleted, // Expose state
     signIn: firebaseAuth.signIn,
     signUp: firebaseAuth.signUp,
     signOut: firebaseAuth.signOut,
     signInWithGoogle,
+    markOnboardingComplete, // Expose function
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

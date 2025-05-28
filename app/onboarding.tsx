@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useRef, useState } from 'react';
@@ -12,8 +11,8 @@ import {
     View
 } from 'react-native';
 import PagerView from 'react-native-pager-view';
+import { useAuth } from '../src/contexts/AuthContext';
 
-const ONBOARDING_KEY = 'hasCompletedOnboarding';
 const TOTAL_PAGES = 3;
 const { width } = Dimensions.get('window');
 
@@ -41,6 +40,7 @@ interface PagerViewOnPageSelectedEventData {
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const { markOnboardingComplete } = useAuth();
   const pagerViewRef = useRef<PagerView>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -48,15 +48,15 @@ export default function OnboardingScreen() {
   const handleOnboardingComplete = async () => {
     console.log('[Onboarding] Get Started button pressed');
     try {
-      console.log('[Onboarding] Attempting to set AsyncStorage item...');
-      await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
-      console.log('[Onboarding] AsyncStorage item set successfully.');
+      console.log('[Onboarding] Calling markOnboardingComplete from AuthContext...');
+      await markOnboardingComplete();
+      console.log('[Onboarding] markOnboardingComplete finished.');
       console.log('[Onboarding] Navigating to /auth...');
       router.replace('/auth');
     } catch (error) {
-      console.error('[Onboarding] Error during onboarding completion:', error);
-      console.log('[Onboarding] Navigating to /auth (from catch block)...');
-      router.replace('/auth'); // Attempt navigation even if AsyncStorage fails
+      console.error('[Onboarding] Error during onboarding completion process:', error);
+      console.log('[Onboarding] Navigating to /auth (from catch block after error)...');
+      router.replace('/auth');
     }
   };
 
