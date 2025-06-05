@@ -9,6 +9,7 @@ import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 // Or, if you have an `apps.tsx`, Expo Router would use that for an `/apps` route.
 // When using a custom navigator like `createMaterialTopTabNavigator`,
 // we explicitly provide the component for each tab.
+import { TestOverlayScreen } from '@/src/screens/TestOverlayScreen'; // Import the test screen
 import AppsScreen from './index'; // Assuming your app/(tabs)/index.tsx is the Apps screen content
 
 const PURE_WHITE = '#FFFFFF';
@@ -80,6 +81,11 @@ export default function TabLayout() {
           name="scheduled"
           component={ScheduledScreenPlaceholder}
           options={{ tabBarLabel: 'SCHEDULED' }}
+        />
+        <Tab.Screen 
+          name="test"
+          component={TestOverlayScreen}
+          options={{ tabBarLabel: 'TEST' }}
         />
       </Tab.Navigator>
     </SafeAreaView>

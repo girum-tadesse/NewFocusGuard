@@ -4,14 +4,14 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react'; // Import useState
 import {
-  ActivityIndicator, // Import ActivityIndicator
-  Alert, // Import Alert
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    ActivityIndicator, // Import ActivityIndicator
+    Alert, // Import Alert
+    SafeAreaView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 
 export default function AuthScreen() {

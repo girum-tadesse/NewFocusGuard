@@ -16,6 +16,12 @@ import com.facebook.soloader.SoLoader
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
 
+// Import our custom packages
+import com.newfocusguard.AppMonitoringPackage
+import com.newfocusguard.AppIconPackage
+import com.newfocusguard.OverlayPermissionPackage
+import com.newfocusguard.InstalledAppsPackage
+
 class MainApplication : Application(), ReactApplication {
 
   override val reactNativeHost: ReactNativeHost = ReactNativeHostWrapper(
@@ -23,8 +29,11 @@ class MainApplication : Application(), ReactApplication {
         object : DefaultReactNativeHost(this) {
           override fun getPackages(): List<ReactPackage> {
             val packages = PackageList(this).packages
-            // Add our custom package
+            // Add our custom packages
             packages.add(AppIconPackage())
+            packages.add(OverlayPermissionPackage())
+            packages.add(AppMonitoringPackage())
+            packages.add(InstalledAppsPackage())
             return packages
           }
 

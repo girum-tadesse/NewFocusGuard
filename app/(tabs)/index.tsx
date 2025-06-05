@@ -1,19 +1,34 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
 import React, { useEffect, useState } from 'react';
-import { FlatList, Image, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Platform, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 // We'll use a simple grid icon for now, you might want to replace this later
 import { MaterialIcons } from '@expo/vector-icons';
 // Only import getInstalledApps, we will define the type locally
-import AppIconModule from '@/src/types/AppIconModule';
-import { getInstalledApps } from 'react-native-get-app-list';
+import { AppCard } from '@/src/components/AppCard';
+import { LockDurationModal } from '@/src/components/LockDurationModal'; // Import LockDurationModal
+import { ScheduleModal } from '@/src/components/ScheduleModal';
+import { useAppLocking } from '@/src/hooks/useAppLocking';
+import { ScheduleConfig as AppScheduleConfig, ScheduledLock } from '@/src/types/LockManagerTypes'; // Import ActiveLock and ScheduledLock
+import { checkOverlayPermission, requestOverlayPermission } from '@/src/utils/OverlayPermission';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
+import { NativeModules } from 'react-native';
+
+const { InstalledApps, AppMonitoringModule } = NativeModules;
+
+// Key for storing selected apps in AsyncStorage (temporary selection on this screen)
+const SELECTED_APPS_UI_STORAGE_KEY = '@FocusGuard:selectedAppsUIState';
+// Key for storing actual active locks
+const ACTIVE_LOCKS_STORAGE_KEY = '@FocusGuard:activeLocks';
+// Key for storing scheduled locks
+const SCHEDULED_LOCKS_STORAGE_KEY = '@FocusGuard:scheduledLocks';
 
 // Define the type based on actual library output confirmed from logs
 interface InstalledAppFromLibrary {
   appName: string;
   packageName: string;
   versionName?: string;
-  // No versionCode or icon is provided by this library
+  icon?: string;
 }
 
 // Define a type for our app data structure, using packageName as id
@@ -23,115 +38,272 @@ interface DisplayAppInfo {
   icon?: string; // Base64 encoded icon
 }
 
+// This is the type ScheduleModal uses internally for its onConfirm callback
+interface ModalScheduleConfig {
+    startDate?: Date;
+    endDate?: Date;
+    startTime: Date;
+    endTime: Date;
+    selectedDays: boolean[];
+}
+
 const PURE_WHITE = '#FFFFFF'; // Define pure white
 
 export default function AppsScreen() {
-  const [searchText, setSearchText] = useState('');
-  const [selectedApps, setSelectedApps] = useState<Set<string>>(new Set());
-  const [installedApps, setInstalledApps] = useState<DisplayAppInfo[]>([]); // State for actual apps
-  const [isLoadingApps, setIsLoadingApps] = useState(true); // Loading state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedAppsUI, setSelectedAppsUI] = useState<Set<string>>(new Set());
+  const [apps, setApps] = useState<DisplayAppInfo[]>([]);
+  const [isLoadingApps, setIsLoadingApps] = useState(true);
+  const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
+  const [isLockDurationModalVisible, setIsLockDurationModalVisible] = useState(false);
+  const { lockApp, unlockApp, isAppLocked } = useAppLocking();
 
   useEffect(() => {
-    const fetchApps = async () => {
-      if (Platform.OS === 'android') { // Ensure it only runs on Android
-        try {
-          setIsLoadingApps(true);
-          console.log('Fetching installed apps...');
-          const apps: InstalledAppFromLibrary[] = await getInstalledApps();
-          console.log('Fetched apps:', apps.length, apps.length > 0 ? apps[0] : 'No apps found to log');
-          
-          // Create array to store apps with icons
-          const appsWithIcons: DisplayAppInfo[] = [];
-          
-          // Fetch icons for each app
-          for (const app of apps) {
-            if (app.appName && app.packageName) {
-              try {
-                const iconResult = await AppIconModule.getAppIcon(app.packageName);
-                appsWithIcons.push({
-                  id: app.packageName,
-                  name: app.appName,
-                  icon: iconResult.icon
-                });
-              } catch (iconError) {
-                console.warn(`Failed to fetch icon for ${app.packageName}:`, iconError);
-                // Still add the app, but without an icon
-                appsWithIcons.push({
-                  id: app.packageName,
-                  name: app.appName
-                });
+    checkAndRequestPermissions();
+    loadApps();
+  }, []);
+
+  // Helper function for Usage Stats part
+  const checkAndRequestUsageStats = async () => {
+    console.log("[Permissions] Entering checkAndRequestUsageStats - User will always be prompted to check settings.");
+    try {
+      // We still log the current status for debugging, but the prompt will always show.
+      const hasUsagePermission = await AppMonitoringModule.hasUsageStatsPermission();
+      console.log("[Permissions] Current usage stats permission status (for logging):", hasUsagePermission);
+
+      Alert.alert(
+        "Step 2: Check Usage Access Permission",
+        "FocusGuard also needs usage access to monitor and lock apps. Please tap 'Go to Settings' to check or grant this permission.",
+        [
+          {
+            text: "Go to Settings",
+            onPress: async () => {
+              console.log("[Permissions] User pressed 'Go to Settings' for Usage Access.");
+              await AppMonitoringModule.requestUsageStatsPermission(); // Opens settings
+              // Optional: Re-check and inform, but primary goal is to take them to settings.
+              const usageGrantedAfterSettings = await AppMonitoringModule.hasUsageStatsPermission();
+              console.log("[Permissions] Usage stats permission status after settings visit (for logging):", usageGrantedAfterSettings);
+              if (!usageGrantedAfterSettings) {
+                Alert.alert("Usage Access Still Needed", "If you didn't grant Usage Access, some features might not work correctly.");
               }
             }
+          },
+          {
+            text: "Skip for Now",
+            style: "cancel",
+            onPress: () => {
+              console.log("[Permissions] User skipped Usage Access settings check.");
+              Alert.alert("Usage Access Skipped", "If Usage Access is not enabled, app monitoring and locking may not function.");
+            }
           }
-          
-          setInstalledApps(appsWithIcons);
-        } catch (error) {
-          console.error('Error fetching installed apps:', error);
-          // Optionally, set an error state here to display to the user
-        } finally {
-          setIsLoadingApps(false);
-        }
-      } else {
-        console.log('Not on Android, skipping app fetch.');
-        // Optionally set some mock data for non-Android or an empty list
-        setInstalledApps([]);
-        setIsLoadingApps(false);
-      }
-    };
+        ]
+      );
+    } catch (error) {
+      console.error('Error in checkAndRequestUsageStats:', error);
+      Alert.alert("Error", "Could not process Usage Access permission check.");
+    }
+  };
 
-    fetchApps();
-  }, []); // Empty dependency array ensures this runs once on mount
+  const checkAndRequestPermissions = async () => {
+    console.log("[Permissions] Entering checkAndRequestPermissions - User will always be prompted for both permissions.");
+    try {
+      // 1. Handle Overlay Permission FIRST - Always prompt
+      console.log("[Permissions] Preparing to prompt for Overlay permission settings check.");
+      // We still log the current status for debugging.
+      const initialOverlayStatus = await checkOverlayPermission();
+      console.log("[Permissions] Current overlay permission status (for logging):", initialOverlayStatus);
 
-  const toggleAppSelection = (appId: string) => {
-    setSelectedApps(prevSelected => {
+      Alert.alert(
+        "Step 1: Check Display Over Other Apps Permission",
+        "FocusGuard needs permission to display over other apps. This is essential for the app locking feature. Please tap 'Go to Settings' to check or grant this permission.",
+        [
+          {
+            text: "Go to Settings",
+            onPress: async () => {
+              console.log("[Permissions] User pressed 'Go to Settings' for overlay.");
+              await requestOverlayPermission(); // Opens settings
+              const overlayStatusAfterSettings = await checkOverlayPermission();
+              console.log("[Permissions] Overlay permission status after settings visit (for logging):", overlayStatusAfterSettings);
+              if (!overlayStatusAfterSettings) {
+                Alert.alert(
+                  "Overlay Permission Still Needed",
+                  "If you didn't grant 'Display over other apps', FocusGuard may not work as expected."
+                );
+              }
+              console.log("[Permissions] Proceeding to usage stats check after overlay settings attempt.");
+              setTimeout(() => {
+                checkAndRequestUsageStats();
+              }, 100);
+            }
+          },
+          {
+            text: "Skip for Now",
+            style: "cancel",
+            onPress: async () => {
+              console.log("[Permissions] User skipped Overlay permission settings check.");
+              Alert.alert(
+                "Overlay Permission Skipped",
+                "If 'Display over other apps' is not enabled, FocusGuard may not work as expected."
+              );
+              console.log("[Permissions] Proceeding to usage stats check after overlay skip.");
+              setTimeout(() => {
+                checkAndRequestUsageStats();
+              }, 100);
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error in checkAndRequestPermissions:', error);
+      Alert.alert("Error", "Could not process application permissions.");
+    }
+  };
+
+  const loadApps = async () => {
+    try {
+      setIsLoadingApps(true);
+      const installedApps = await InstalledApps.getInstalledApps();
+      const formattedApps: DisplayAppInfo[] = installedApps.map((app: InstalledAppFromLibrary) => ({
+        id: app.packageName,
+        name: app.appName,
+        icon: app.icon
+      }));
+      setApps(formattedApps);
+    } catch (error) {
+      console.error('Error loading apps:', error);
+    } finally {
+      setIsLoadingApps(false);
+    }
+  };
+
+  const toggleAppSelection = (app: DisplayAppInfo) => {
+    setSelectedAppsUI(prevSelected => {
       const newSelected = new Set(prevSelected);
-      if (newSelected.has(appId)) {
-        newSelected.delete(appId);
+      if (newSelected.has(app.id)) {
+        newSelected.delete(app.id);
       } else {
-        newSelected.add(appId);
+        newSelected.add(app.id);
       }
+      // Save updated selection to AsyncStorage
+      AsyncStorage.setItem(SELECTED_APPS_UI_STORAGE_KEY, JSON.stringify(Array.from(newSelected)))
+        .catch(error => console.error('Failed to save UI selected apps to storage:', error));
       return newSelected;
     });
   };
 
-  // renderAppItem now expects DisplayAppInfo
-  const renderAppItem = ({ item }: { item: DisplayAppInfo }) => (
-    <TouchableOpacity
-      style={[styles.appItem, selectedApps.has(item.id) && styles.appItemSelected]}
-      onPress={() => toggleAppSelection(item.id)}
-    >
-      {item.icon ? (
-        <Image
-          source={{ uri: `data:image/png;base64,${item.icon}` }}
-          style={styles.appIcon}
-        />
-      ) : (
-        <MaterialIcons 
-          name="apps" 
-          size={30} 
-          color={selectedApps.has(item.id) ? '#FF7757' : "#888"} 
-          style={styles.appIconPlaceholder} 
-        />
-      )}
-      <Text style={[styles.appName, selectedApps.has(item.id) && styles.appNameSelected]} numberOfLines={1}>{item.name}</Text>
-    </TouchableOpacity>
-  );
+  const handleLockNow = async (app: DisplayAppInfo, duration?: number) => {
+    try {
+      // If no apps are selected, show alert
+      if (selectedAppsUI.size === 0) {
+        Alert.alert("No Apps Selected", "Please select at least one app to lock.");
+        return;
+      }
 
-  // Filter apps based on search text
-  const filteredApps = installedApps.filter(app =>
-    app.name.toLowerCase().includes(searchText.toLowerCase())
-  );
+      // Check permissions before locking
+      const hasUsagePermission = await AppMonitoringModule.hasUsageStatsPermission();
+      const hasOverlayPermission = await checkOverlayPermission();
+      if (!hasUsagePermission || !hasOverlayPermission) {
+        Alert.alert(
+          "Permissions Required",
+          "You must grant Usage Access and Display Over Other Apps permissions to use the lock feature.",
+          [
+            {
+              text: "Grant Usage Access",
+              onPress: async () => {
+                await AppMonitoringModule.requestUsageStatsPermission();
+              }
+            },
+            {
+              text: "Grant Overlay Permission",
+              onPress: async () => {
+                await requestOverlayPermission();
+              }
+            },
+            { text: "Cancel", style: "cancel" }
+          ],
+          { cancelable: false }
+        );
+        return;
+      }
 
-  // Display loading indicator or empty list message
-  const ListContent = () => {
-    if (isLoadingApps) {
-      return <Text style={styles.emptyListText}>Loading apps...</Text>;
+      // Lock all selected apps
+      for (const appId of selectedAppsUI) {
+        const appToLock = apps.find(a => a.id === appId);
+        if (appToLock) {
+          await lockApp(appToLock.id, appToLock.name, duration);
+        }
+      }
+
+      // Clear selection after locking
+      setSelectedAppsUI(new Set());
+      AsyncStorage.removeItem(SELECTED_APPS_UI_STORAGE_KEY);
+      setIsLockDurationModalVisible(false);
+      Alert.alert("Success", "Selected apps have been locked successfully.");
+    } catch (error) {
+      console.error('Error locking apps:', error);
+      Alert.alert("Error", "Failed to lock selected apps. Please try again.");
     }
-    if (filteredApps.length === 0 && !isLoadingApps) {
-      return <Text style={styles.emptyListText}>{searchText ? 'No apps match your search.' : 'No apps found.'}</Text>;
-    }
-    return null; // Handled by FlatList's ListEmptyComponent if data is empty after loading
   };
+
+  const handleOpenScheduleModal = () => {
+    if (selectedAppsUI.size === 0) {
+      Alert.alert("No Apps Selected", "Please select at least one app to schedule.");
+      return;
+    }
+    setIsScheduleModalVisible(true);
+  };
+
+  const handleConfirmSchedule = async (modalScheduleConfig: ModalScheduleConfig) => {
+    const newScheduleId = Date.now().toString();
+    
+    // Adapt ModalScheduleConfig to AppScheduleConfig from LockManagerTypes
+    // For now, we directly use the modal's structure but ensure all fields are there.
+    // A more robust solution might involve more transformation if types diverge significantly.
+    const appScheduleConfig: AppScheduleConfig = {
+        startDate: modalScheduleConfig.startDate, // Potentially optional in our main type
+        endDate: modalScheduleConfig.endDate,     // Potentially optional
+        startTime: modalScheduleConfig.startTime,
+        endTime: modalScheduleConfig.endTime,
+        selectedDays: modalScheduleConfig.selectedDays, // This is an array of 7 booleans for Mon-Sun
+    };
+
+    const newScheduledLock: ScheduledLock = {
+      id: newScheduleId,
+      appPackageNames: Array.from(selectedAppsUI),
+      scheduleConfig: appScheduleConfig, 
+      isEnabled: true, 
+      createdAt: Date.now(),
+    };
+
+    try {
+      const existingScheduledJson = await AsyncStorage.getItem(SCHEDULED_LOCKS_STORAGE_KEY);
+      const existingScheduledLocks: ScheduledLock[] = existingScheduledJson ? JSON.parse(existingScheduledJson) : [];
+      const updatedScheduledLocks = [...existingScheduledLocks, newScheduledLock];
+      await AsyncStorage.setItem(SCHEDULED_LOCKS_STORAGE_KEY, JSON.stringify(updatedScheduledLocks));
+      
+      Alert.alert("Schedule Set", `Apps scheduled successfully.`);
+      console.log('Scheduled lock saved:', newScheduledLock);
+      setIsScheduleModalVisible(false);
+      setSelectedAppsUI(new Set());
+      AsyncStorage.removeItem(SELECTED_APPS_UI_STORAGE_KEY);
+    } catch (error) {
+      console.error('Failed to save scheduled lock:', error);
+      Alert.alert("Error", "Failed to schedule apps. Please try again.");
+      setIsScheduleModalVisible(false); // Close modal even on error
+    }
+  };
+
+  const handleOpenLockNowModal = () => {
+    if (selectedAppsUI.size === 0) {
+      Alert.alert("No Apps Selected", "Please select at least one app to lock.");
+      return;
+    }
+    setIsLockDurationModalVisible(true);
+  };
+
+  const filteredApps = apps.filter(app =>
+    app.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -142,38 +314,62 @@ export default function AppsScreen() {
             style={styles.searchBar}
             placeholder="Search apps..."
             placeholderTextColor="#888"
-            value={searchText}
-            onChangeText={setSearchText}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
         </View>
 
-        {/* Conditional rendering for loading or list */}
         {isLoadingApps && <Text style={styles.emptyListText}>Loading apps...</Text>}
         {!isLoadingApps && (
           <FlatList
             data={filteredApps}
-            renderItem={renderAppItem}
-            keyExtractor={item => item.id} // id is now packageName
-            numColumns={4} // Adjust number of columns as needed
-            style={styles.appList}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <AppCard
+                app={item}
+                isLocked={isAppLocked(item.id)}
+                isSelected={selectedAppsUI.has(item.id)}
+                onSelect={toggleAppSelection}
+              />
+            )}
             contentContainerStyle={styles.appListContent}
+            numColumns={4}
+            columnWrapperStyle={styles.row}
             ListEmptyComponent={
               <Text style={styles.emptyListText}>
-                {searchText ? 'No apps match your search.' : (Platform.OS === 'android' ? 'No apps found on device.' : 'App list not available on this platform.')}
+                {searchQuery ? 'No apps match your search.' : (Platform.OS === 'android' ? 'No apps found on device.' : 'App list not available on this platform.')}
               </Text>
             }
           />
         )}
 
         <View style={styles.buttonsContainer}>
-          <TouchableOpacity style={styles.scheduleButton} onPress={() => console.log('Schedule pressed', Array.from(selectedApps))}>
-            <ThemedText style={styles.buttonText}>SCHEDULE</ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.lockNowButton} onPress={() => console.log('Lock Now pressed', Array.from(selectedApps))}>
+          <TouchableOpacity style={styles.lockNowButton} onPress={handleOpenLockNowModal}>
             <ThemedText style={styles.buttonText}>LOCK NOW</ThemedText>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.scheduleButton} onPress={handleOpenScheduleModal}>
+            <ThemedText style={styles.buttonText}>SCHEDULE</ThemedText>
           </TouchableOpacity>
         </View>
       </ThemedView>
+
+      <ScheduleModal
+        isVisible={isScheduleModalVisible}
+        onClose={() => setIsScheduleModalVisible(false)}
+        onConfirm={handleConfirmSchedule}
+      />
+
+      <LockDurationModal
+        isVisible={isLockDurationModalVisible}
+        onClose={() => setIsLockDurationModalVisible(false)}
+        onConfirm={handleLockNow}
+        selectedAppsCount={selectedAppsUI.size}
+        app={{
+          id: Array.from(selectedAppsUI)[0] || '',
+          name: `${selectedAppsUI.size} selected app${selectedAppsUI.size !== 1 ? 's' : ''}`,
+          icon: apps.find(app => app.id === Array.from(selectedAppsUI)[0])?.icon
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -217,46 +413,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   appListContent: {
-    alignItems: 'center', 
+    paddingHorizontal: 8,
   },
-  appItem: {
-    backgroundColor: PURE_WHITE, 
-    borderRadius: 10,
-    padding: 10,
-    margin: 6, 
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 75, 
-    height: 75, 
-    borderWidth: 1,
-    borderColor: '#EAEAEA', 
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
-    elevation: 1,
+  row: {
+    flex: 1,
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
-  appItemSelected: {
-    borderColor: '#FF7757', 
-    backgroundColor: '#FFF0E6',
-  },
-  appIcon: {
-    width: 30,
-    height: 30,
-    marginBottom: 5,
-    resizeMode: 'contain',
-  },
-  appIconPlaceholder: {
-    marginBottom: 5,
-  },
-  appName: {
-    fontSize: 12,
+  emptyListText: {
+    marginTop: 50,
+    fontSize: 16,
+    color: '#888',
     textAlign: 'center',
-    color: '#333',
-  },
-  appNameSelected: {
-    color: '#FF7757',
-    fontWeight: 'bold',
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   buttonsContainer: {
     flexDirection: 'row',
@@ -265,6 +436,17 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
     backgroundColor: PURE_WHITE,
+  },
+  lockNowButton: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: '#FF7757',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
   },
   scheduleButton: {
     backgroundColor: '#FFFFFF', 
@@ -276,25 +458,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  lockNowButton: {
-    backgroundColor: '#FF7757', 
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   buttonText: {
     fontSize: 16,
     fontWeight: '600',
   },
-  emptyListText: {
-    marginTop: 50,
-    fontSize: 16,
-    color: '#888',
-    textAlign: 'center',
-    flex: 1, // Ensure it can take up space if FlatList is empty
-    justifyContent: 'center',
-    alignItems: 'center'
-  }
 });
