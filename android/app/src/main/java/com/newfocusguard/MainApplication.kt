@@ -21,6 +21,7 @@ import com.newfocusguard.AppMonitoringPackage
 import com.newfocusguard.AppIconPackage
 import com.newfocusguard.OverlayPermissionPackage
 import com.newfocusguard.InstalledAppsPackage
+import com.newfocusguard.OverlayPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -34,6 +35,7 @@ class MainApplication : Application(), ReactApplication {
             packages.add(OverlayPermissionPackage())
             packages.add(AppMonitoringPackage())
             packages.add(InstalledAppsPackage())
+            packages.add(OverlayPackage())
             return packages
           }
 

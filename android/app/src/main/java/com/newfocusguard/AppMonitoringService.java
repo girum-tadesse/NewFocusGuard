@@ -20,6 +20,17 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.LinearLayout.LayoutParams;
+import android.widget.ImageView;
+import android.widget.TextView;
+import android.widget.Space;
+import android.view.Gravity;
+import android.graphics.Typeface;
+
+import com.facebook.react.ReactApplication;
+import com.facebook.react.ReactNativeHost;
 import androidx.core.app.NotificationCompat;
 
 import com.facebook.react.bridge.Arguments;
@@ -348,12 +359,165 @@ public class AppMonitoringService extends Service {
         if (overlayView != null) {
             return;
         }
-        overlayView = new View(this);
-        overlayView.setBackgroundColor(Color.argb(200, 0, 0, 0));
+
         try {
+            // Create a layout for our overlay
+            FrameLayout overlayLayout = new FrameLayout(this);
+            overlayLayout.setBackgroundColor(Color.parseColor("#FF8C00")); // Orange background
+            
+            // Create a vertical layout for content
+            LinearLayout contentLayout = new LinearLayout(this);
+            contentLayout.setOrientation(LinearLayout.VERTICAL);
+            contentLayout.setGravity(Gravity.CENTER);
+            contentLayout.setPadding(50, 100, 50, 100);
+            
+            // Create a circular background for the lock icon
+            FrameLayout iconContainer = new FrameLayout(this);
+            FrameLayout.LayoutParams iconContainerParams = new FrameLayout.LayoutParams(
+                240, 240
+            );
+            iconContainerParams.gravity = Gravity.CENTER_HORIZONTAL;
+            iconContainer.setLayoutParams(iconContainerParams);
+            iconContainer.setBackgroundColor(Color.parseColor("#33FFFFFF")); // Semi-transparent white
+            
+            // Set the container to be circular
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                iconContainer.setBackground(getDrawable(R.drawable.circle_background));
+            } else {
+                iconContainer.setBackgroundColor(Color.parseColor("#33FFFFFF"));
+            }
+            
+            // Create the lock icon
+            ImageView lockIcon = new ImageView(this);
+            FrameLayout.LayoutParams lockIconParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            );
+            lockIconParams.gravity = Gravity.CENTER;
+            lockIcon.setLayoutParams(lockIconParams);
+            lockIcon.setImageResource(android.R.drawable.ic_lock_lock);
+            lockIcon.setColorFilter(Color.WHITE);
+            iconContainer.addView(lockIcon);
+            
+            // Add the icon container to the content layout
+            contentLayout.addView(iconContainer);
+            
+            // Add some spacing
+            Space space1 = new Space(this);
+            space1.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 40
+            ));
+            contentLayout.addView(space1);
+            
+            // Create the app name text
+            TextView appNameText = new TextView(this);
+            appNameText.setText(packageName + " is locked");
+            appNameText.setTextColor(Color.WHITE);
+            appNameText.setTextSize(24);
+            appNameText.setGravity(Gravity.CENTER);
+            appNameText.setTypeface(null, Typeface.BOLD);
+            contentLayout.addView(appNameText);
+            
+            // Add some spacing
+            Space space2 = new Space(this);
+            space2.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 40
+            ));
+            contentLayout.addView(space2);
+            
+            // Create a container for the quote
+            FrameLayout quoteContainer = new FrameLayout(this);
+            quoteContainer.setBackgroundColor(Color.parseColor("#33FFFFFF")); // Semi-transparent white
+            quoteContainer.setPadding(30, 30, 30, 30);
+            
+            // Create the quote text
+            TextView quoteText = new TextView(this);
+            quoteText.setText("\"Focus on what matters most today.\"");
+            quoteText.setTextColor(Color.WHITE);
+            quoteText.setTextSize(18);
+            quoteText.setGravity(Gravity.CENTER);
+            quoteText.setTypeface(null, Typeface.ITALIC);
+            quoteContainer.addView(quoteText);
+            
+            // Add the quote container to the content layout
+            contentLayout.addView(quoteContainer);
+            
+            // Add some spacing
+            Space space3 = new Space(this);
+            space3.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 40
+            ));
+            contentLayout.addView(space3);
+            
+            // Create a container for emergency unlock chances
+            FrameLayout chancesContainer = new FrameLayout(this);
+            chancesContainer.setBackgroundColor(Color.parseColor("#33FFFFFF")); // Semi-transparent white
+            chancesContainer.setPadding(30, 20, 30, 20);
+            
+            // Create the emergency unlock chances text
+            TextView chancesText = new TextView(this);
+            chancesText.setText("Emergency unlock chances remaining this week: 3");
+            chancesText.setTextColor(Color.WHITE);
+            chancesText.setTextSize(16);
+            chancesText.setGravity(Gravity.CENTER);
+            chancesContainer.addView(chancesText);
+            
+            // Add the chances container to the content layout
+            contentLayout.addView(chancesContainer);
+            
+            // Add some spacing
+            Space space4 = new Space(this);
+            space4.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 40
+            ));
+            contentLayout.addView(space4);
+            
+            // Create the emergency unlock button
+            TextView emergencyButton = new TextView(this);
+            emergencyButton.setText("Emergency Unlock");
+            emergencyButton.setTextColor(Color.parseColor("#FF8C00")); // Orange text
+            emergencyButton.setBackgroundColor(Color.WHITE);
+            emergencyButton.setTextSize(18);
+            emergencyButton.setTypeface(null, Typeface.BOLD);
+            emergencyButton.setPadding(60, 30, 60, 30);
+            emergencyButton.setGravity(Gravity.CENTER);
+            
+            // Make the button look rounded
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                emergencyButton.setBackground(getDrawable(R.drawable.rounded_button));
+            }
+            
+            // Add onClick listener to the button
+            emergencyButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    // Remove the app from locked apps
+                    if (currentlyOverlayingPackage != null) {
+                        lockedApps.remove(currentlyOverlayingPackage);
+                        saveLockedApps();
+                        hideNativeOverlay();
+                        
+                        // Send event to React Native
+                        sendEvent("onEmergencyUnlock", currentlyOverlayingPackage);
+                    }
+                }
+            });
+            
+            // Add the button to the content layout
+            contentLayout.addView(emergencyButton);
+            
+            // Add the content layout to the main overlay layout
+            overlayLayout.addView(contentLayout, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                Gravity.CENTER
+            ));
+            
+            // Use the layout as our overlay view
+            overlayView = overlayLayout;
             windowManager.addView(overlayView, overlayParams);
             currentlyOverlayingPackage = packageName;
-            Log.i(TAG, "Overlay ADDED successfully for " + packageName);
+            Log.i(TAG, "Enhanced overlay ADDED for " + packageName);
         } catch (Exception e) {
             Log.e(TAG, "CRITICAL ERROR adding overlay view for " + packageName, e);
             overlayView = null;

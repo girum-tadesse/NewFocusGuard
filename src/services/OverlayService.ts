@@ -1,12 +1,23 @@
-import { AppRegistry } from 'react-native';
+import { AppRegistry, NativeEventEmitter, NativeModules } from 'react-native';
 import { LockOverlay } from '../components/LockOverlay';
 import { ensureOverlayPermission } from '../utils/OverlayPermission';
 
-class OverlayService {
+const { OverlayModule } = NativeModules;
+
+export class OverlayService {
   private static instance: OverlayService;
   private isOverlayVisible: boolean = false;
+  private eventEmitter: NativeEventEmitter | null = null;
 
-  private constructor() {}
+  private constructor() {
+    // Set up event listener for emergency unlock
+    if (OverlayModule) {
+      this.eventEmitter = new NativeEventEmitter(OverlayModule);
+      this.eventEmitter.addListener('onEmergencyUnlock', () => {
+        this.isOverlayVisible = false;
+      });
+    }
+  }
 
   static getInstance(): OverlayService {
     if (!OverlayService.instance) {
@@ -15,7 +26,13 @@ class OverlayService {
     return OverlayService.instance;
   }
 
-  async showLockOverlay(appName: string, timeRemaining?: string, onEmergencyUnlock?: () => void) {
+  async showLockOverlay(
+    appName: string, 
+    timeRemaining?: string, 
+    onEmergencyUnlock?: () => void,
+    emergencyUnlockChances?: number,
+    quote?: string
+  ) {
     if (this.isOverlayVisible) {
       return;
     }
@@ -28,22 +45,39 @@ class OverlayService {
 
     this.isOverlayVisible = true;
     
-    // Register the overlay component
+    // Register the overlay component for React Native
     AppRegistry.registerComponent('LockOverlay', () => () => 
       LockOverlay({ 
         appName, 
         timeRemaining, 
+        emergencyUnlockChances,
+        quote,
         onEmergencyUnlock: () => {
           if (onEmergencyUnlock) {
             onEmergencyUnlock();
           }
-          this.hideLockOverlay();
+          
+          // Call native module to handle emergency unlock
+          if (OverlayModule && OverlayModule.onEmergencyUnlock) {
+            OverlayModule.onEmergencyUnlock();
+          } else {
+            this.hideLockOverlay();
+          }
         }
       })
     );
 
     // Show the overlay using the native module
-    // Note: This will be implemented in the native module later
+    if (OverlayModule && OverlayModule.showOverlay) {
+      OverlayModule.showOverlay(
+        appName,
+        timeRemaining || '',
+        emergencyUnlockChances || 0,
+        quote || ''
+      );
+    } else {
+      console.warn('Native OverlayModule not available');
+    }
   }
 
   hideLockOverlay() {
@@ -54,6 +88,10 @@ class OverlayService {
     this.isOverlayVisible = false;
     
     // Hide the overlay using the native module
-    // Note: This will be implemented in the native module later
+    if (OverlayModule && OverlayModule.hideOverlay) {
+      OverlayModule.hideOverlay();
+    } else {
+      console.warn('Native OverlayModule not available');
+    }
   }
 } 
