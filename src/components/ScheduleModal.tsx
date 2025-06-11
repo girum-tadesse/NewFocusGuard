@@ -1,6 +1,7 @@
 import { ScheduleConfig } from '@/src/types/LockManagerTypes';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useState } from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { TimePicker } from './TimePicker';
 import { WeekdayPicker } from './WeekdayPicker';
 
@@ -18,23 +19,58 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const [selectedDays, setSelectedDays] = useState<boolean[]>([false, false, false, false, false, false, false]);
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('17:00');
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
+
+  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
 
   const handleConfirm = () => {
     const [startHours, startMinutes] = startTime.split(':').map(Number);
     const [endHours, endMinutes] = endTime.split(':').map(Number);
     
-    const startTimeDate = new Date();
-    startTimeDate.setHours(startHours, startMinutes, 0, 0);
+    const finalStartDate = new Date(startDate);
+    finalStartDate.setHours(startHours, startMinutes, 0, 0);
     
-    const endTimeDate = new Date();
-    endTimeDate.setHours(endHours, endMinutes, 0, 0);
+    const finalEndDate = new Date(endDate);
+    finalEndDate.setHours(endHours, endMinutes, 0, 0);
+
+    // If no days are selected, select all days
+    const effectiveSelectedDays = selectedDays.some(day => day) 
+      ? selectedDays 
+      : [true, true, true, true, true, true, true];
 
     onConfirm({
-      startTime: startTimeDate,
-      endTime: endTimeDate,
-      selectedDays,
+      startDate: finalStartDate,
+      endDate: finalEndDate,
+      startTime: finalStartDate,
+      endTime: finalEndDate,
+      selectedDays: effectiveSelectedDays,
     });
   };
+  
+  const onStartDateChange = (event: any, selectedDate?: Date) => {
+    const currentDate = selectedDate || startDate;
+    setShowStartDatePicker(Platform.OS === 'ios');
+    setStartDate(currentDate);
+    if (currentDate > endDate) {
+      setEndDate(currentDate);
+    }
+  };
+
+  const onEndDateChange = (event: any, selectedDate?: Date) => {
+    const currentDate = selectedDate || endDate;
+    setShowEndDatePicker(Platform.OS === 'ios');
+    setEndDate(currentDate);
+  };
+  
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  }
 
   return (
     <Modal
@@ -54,21 +90,60 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
               onDaysChange={setSelectedDays}
             />
           </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Start Time</Text>
-            <TimePicker
-              value={startTime}
-              onChange={setStartTime}
-            />
+          
+          <View style={styles.dateContainer}>
+            <View style={styles.datePicker}>
+              <Text style={styles.sectionTitle}>Start Date</Text>
+              <TouchableOpacity onPress={() => setShowStartDatePicker(true)} style={styles.dateDisplay}>
+                 <Text>{formatDate(startDate)}</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.datePicker}>
+              <Text style={styles.sectionTitle}>End Date</Text>
+              <TouchableOpacity onPress={() => setShowEndDatePicker(true)} style={styles.dateDisplay}>
+                 <Text>{formatDate(endDate)}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>End Time</Text>
-            <TimePicker
-              value={endTime}
-              onChange={setEndTime}
+          {showStartDatePicker && (
+            <DateTimePicker
+              testID="startDatePicker"
+              value={startDate}
+              mode="date"
+              display="default"
+              onChange={onStartDateChange}
+              minimumDate={new Date()}
             />
+          )}
+
+          {showEndDatePicker && (
+            <DateTimePicker
+              testID="endDatePicker"
+              value={endDate}
+              mode="date"
+              display="default"
+              onChange={onEndDateChange}
+              minimumDate={startDate}
+            />
+          )}
+
+
+          <View style={styles.timeContainer}>
+            <View style={styles.timePicker}>
+                <Text style={styles.sectionTitle}>Start Time</Text>
+                <TimePicker
+                value={startTime}
+                onChange={setStartTime}
+                />
+            </View>
+            <View style={styles.timePicker}>
+                <Text style={styles.sectionTitle}>End Time</Text>
+                <TimePicker
+                value={endTime}
+                onChange={setEndTime}
+                />
+            </View>
           </View>
 
           <View style={styles.buttons}>
@@ -114,11 +189,37 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   section: {
-    marginBottom: 20,
+    marginBottom: 10,
   },
   sectionTitle: {
     fontSize: 16,
     marginBottom: 8,
+    fontWeight: '500',
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  datePicker: {
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  dateDisplay: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  timeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  timePicker: {
+    flex: 1,
+    marginHorizontal: 5,
   },
   buttons: {
     flexDirection: 'row',

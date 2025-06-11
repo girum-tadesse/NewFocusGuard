@@ -9,7 +9,8 @@ import { AppCard } from '@/src/components/AppCard';
 import { LockDurationModal } from '@/src/components/LockDurationModal'; // Import LockDurationModal
 import { ScheduleModal } from '@/src/components/ScheduleModal';
 import { useAppLocking } from '@/src/hooks/useAppLocking';
-import { ScheduleConfig as AppScheduleConfig, ScheduledLock } from '@/src/types/LockManagerTypes'; // Import ActiveLock and ScheduledLock
+import { scheduleManager } from '@/src/services/ScheduleManager';
+import { ScheduleConfig, ScheduledLock } from '@/src/types/LockManagerTypes'; // Import ActiveLock and ScheduledLock
 import { checkOverlayPermission, requestOverlayPermission } from '@/src/utils/OverlayPermission';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Import AsyncStorage
 import { NativeModules } from 'react-native';
@@ -57,11 +58,60 @@ export default function AppsScreen() {
   const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
   const [isLockDurationModalVisible, setIsLockDurationModalVisible] = useState(false);
   const { lockApp, unlockApp, isAppLocked } = useAppLocking();
+  
+  // This state will trigger the sync effect when schedules change
+  const [scheduledLocks, setScheduledLocks] = useState<ScheduledLock[]>([]);
 
   useEffect(() => {
     checkAndRequestPermissions();
     loadApps();
+    loadSchedules(); // Load schedules on initial component mount
   }, []);
+  
+  // Effect to sync schedules with the native module
+  useEffect(() => {
+    if (scheduledLocks.length > 0) {
+      console.log('[AppsScreen] Syncing schedules with native module. Count:', scheduledLocks.length);
+      console.log('[AppsScreen] Schedule details:', JSON.stringify(scheduledLocks, null, 2));
+      
+      const schedulesJson = JSON.stringify(scheduledLocks);
+      AppMonitoringModule.setScheduledLocks(schedulesJson)
+        .then(() => console.log('[AppsScreen] Successfully synced schedules with native module.'))
+        .catch((e: any) => {
+          console.error('[AppsScreen] Failed to sync schedules with native module:', e);
+          console.error('[AppsScreen] Error details:', e.message);
+        });
+    } else {
+      console.log('[AppsScreen] No schedules to sync with native module');
+    }
+  }, [scheduledLocks]);
+
+  const loadSchedules = async () => {
+    try {
+      console.log('[AppsScreen] Loading schedules from storage');
+      // Load schedules from storage
+      const firestoreSchedules = await scheduleManager.getSchedulesForUser();
+      console.log('[AppsScreen] Loaded schedules count:', firestoreSchedules.length);
+      
+      setScheduledLocks(firestoreSchedules);
+      
+      // Sync with native module
+      if (firestoreSchedules.length > 0) {
+        console.log('[AppsScreen] Preparing to sync schedules with native module');
+        const schedulesJson = JSON.stringify(firestoreSchedules);
+        await AppMonitoringModule.setScheduledLocks(schedulesJson);
+        console.log('[AppsScreen] Successfully synced schedules with native module');
+      } else {
+        console.log('[AppsScreen] No schedules to sync');
+      }
+    } catch (error) {
+      console.error('[AppsScreen] Failed to load or sync schedules:', error);
+      Alert.alert(
+        "Schedule Sync Error",
+        "Failed to sync schedules. Some scheduled locks may not work properly."
+      );
+    }
+  };
 
   // Helper function for Usage Stats part
   const checkAndRequestUsageStats = async () => {
@@ -105,57 +155,116 @@ export default function AppsScreen() {
   };
 
   const checkAndRequestPermissions = async () => {
-    console.log("[Permissions] Entering checkAndRequestPermissions - User will always be prompted for both permissions.");
+    console.log("[Permissions] Starting permission setup flow");
     try {
-      // 1. Handle Overlay Permission FIRST - Always prompt
-      console.log("[Permissions] Preparing to prompt for Overlay permission settings check.");
-      // We still log the current status for debugging.
-      const initialOverlayStatus = await checkOverlayPermission();
-      console.log("[Permissions] Current overlay permission status (for logging):", initialOverlayStatus);
-
+      // Show initial welcome message
       Alert.alert(
-        "Step 1: Check Display Over Other Apps Permission",
-        "FocusGuard needs permission to display over other apps. This is essential for the app locking feature. Please tap 'Go to Settings' to check or grant this permission.",
+        "Welcome to FocusGuard!",
+        "To help you stay focused, we need two permissions. We'll guide you through setting these up step by step.",
         [
           {
-            text: "Go to Settings",
+            text: "Let's Start",
             onPress: async () => {
-              console.log("[Permissions] User pressed 'Go to Settings' for overlay.");
-              await requestOverlayPermission(); // Opens settings
-              const overlayStatusAfterSettings = await checkOverlayPermission();
-              console.log("[Permissions] Overlay permission status after settings visit (for logging):", overlayStatusAfterSettings);
-              if (!overlayStatusAfterSettings) {
+              try {
+                // 1. Handle Overlay Permission FIRST
+                console.log("[Permissions] Starting overlay permission flow");
+                await new Promise<void>((resolve) => {
+                  Alert.alert(
+                    "Step 1 of 2: Display Over Other Apps",
+                    "First, we need permission to show the lock screen when you try to open a locked app.\n\nOn the next screen, find FocusGuard in the list and turn on 'Allow display over other apps'.",
+                    [
+                      {
+                        text: "Open Settings",
+                        onPress: async () => {
+                          try {
+                            console.log("[Permissions] User proceeding to overlay settings");
+                            await requestOverlayPermission();
+                            const overlayGranted = await checkOverlayPermission();
+                            console.log("[Permissions] Overlay permission status:", overlayGranted);
+                            
+                            if (!overlayGranted) {
+                              Alert.alert(
+                                "Permission Not Detected",
+                                "The 'Display over other apps' permission appears to be off. Some features may not work correctly.",
+                                [{ text: "Continue to Next Step", onPress: () => resolve() }]
+                              );
+                            } else {
+                              Alert.alert(
+                                "Permission Granted",
+                                "Display over other apps permission is set up successfully.",
+                                [{ text: "Continue to Next Step", onPress: () => resolve() }]
+                              );
+                            }
+                          } catch (error) {
+                            console.error("[Permissions] Error in overlay setup:", error);
+                            resolve(); // Continue to next step even if there's an error
+                          }
+                        }
+                      }
+                    ],
+                    { cancelable: false }
+                  );
+                });
+
+                // 2. Handle Usage Stats Permission
+                console.log("[Permissions] Starting usage stats permission flow");
+                await new Promise<void>((resolve) => {
+                  Alert.alert(
+                    "Step 2 of 2: Usage Access",
+                    "Next, we need permission to detect when you open a locked app.\n\nOn the next screen, find FocusGuard in the list and turn on 'Permit usage access'.",
+                    [
+                      {
+                        text: "Open Settings",
+                        onPress: async () => {
+                          try {
+                            console.log("[Permissions] User proceeding to usage access settings");
+                            await AppMonitoringModule.requestUsageStatsPermission();
+                            const usageGranted = await AppMonitoringModule.hasUsageStatsPermission();
+                            console.log("[Permissions] Usage access permission status:", usageGranted);
+                            
+                            if (!usageGranted) {
+                              Alert.alert(
+                                "Permission Not Detected",
+                                "The Usage Access permission appears to be off. Some features may not work correctly.",
+                                [{ text: "Finish Setup", onPress: () => resolve() }]
+                              );
+                            } else {
+                              Alert.alert(
+                                "Setup Complete!",
+                                "Great! FocusGuard is now ready to help you stay focused.",
+                                [{ text: "Start Using FocusGuard", onPress: () => resolve() }]
+                              );
+                            }
+                          } catch (error) {
+                            console.error("[Permissions] Error in usage stats setup:", error);
+                            resolve(); // Continue even if there's an error
+                          }
+                        }
+                      }
+                    ],
+                    { cancelable: false }
+                  );
+                });
+              } catch (error) {
+                console.error("[Permissions] Error in permission flow:", error);
+                // Show error but don't prevent the app from being used
                 Alert.alert(
-                  "Overlay Permission Still Needed",
-                  "If you didn't grant 'Display over other apps', FocusGuard may not work as expected."
+                  "Permission Setup Issue",
+                  "There was an issue during permission setup. You can try setting permissions again from the app settings.",
+                  [{ text: "OK" }]
                 );
               }
-              console.log("[Permissions] Proceeding to usage stats check after overlay settings attempt.");
-              setTimeout(() => {
-                checkAndRequestUsageStats();
-              }, 100);
-            }
-          },
-          {
-            text: "Skip for Now",
-            style: "cancel",
-            onPress: async () => {
-              console.log("[Permissions] User skipped Overlay permission settings check.");
-              Alert.alert(
-                "Overlay Permission Skipped",
-                "If 'Display over other apps' is not enabled, FocusGuard may not work as expected."
-              );
-              console.log("[Permissions] Proceeding to usage stats check after overlay skip.");
-              setTimeout(() => {
-                checkAndRequestUsageStats();
-              }, 100);
             }
           }
-        ]
+        ],
+        { cancelable: false }
       );
     } catch (error) {
-      console.error('Error in checkAndRequestPermissions:', error);
-      Alert.alert("Error", "Could not process application permissions.");
+      console.error('[Permissions] Error in permission setup:', error);
+      Alert.alert(
+        "Setup Error",
+        "There was an error during the permission setup. Please try again later."
+      );
     }
   };
 
@@ -253,43 +362,32 @@ export default function AppsScreen() {
     setIsScheduleModalVisible(true);
   };
 
-  const handleConfirmSchedule = async (modalScheduleConfig: ModalScheduleConfig) => {
-    const newScheduleId = Date.now().toString();
+  const handleConfirmSchedule = async (modalScheduleConfig: ScheduleConfig) => {
+    console.log('[AppsScreen] Confirming new schedule');
+    const selectedApps = Array.from(selectedAppsUI);
+    console.log('[AppsScreen] Selected apps:', selectedApps);
     
-    // Adapt ModalScheduleConfig to AppScheduleConfig from LockManagerTypes
-    // For now, we directly use the modal's structure but ensure all fields are there.
-    // A more robust solution might involve more transformation if types diverge significantly.
-    const appScheduleConfig: AppScheduleConfig = {
-        startDate: modalScheduleConfig.startDate, // Potentially optional in our main type
-        endDate: modalScheduleConfig.endDate,     // Potentially optional
-        startTime: modalScheduleConfig.startTime,
-        endTime: modalScheduleConfig.endTime,
-        selectedDays: modalScheduleConfig.selectedDays, // This is an array of 7 booleans for Mon-Sun
-    };
-
-    const newScheduledLock: ScheduledLock = {
-      id: newScheduleId,
-      appPackageNames: Array.from(selectedAppsUI),
-      scheduleConfig: appScheduleConfig, 
-      isEnabled: true, 
-      createdAt: Date.now(),
-    };
-
     try {
-      const existingScheduledJson = await AsyncStorage.getItem(SCHEDULED_LOCKS_STORAGE_KEY);
-      const existingScheduledLocks: ScheduledLock[] = existingScheduledJson ? JSON.parse(existingScheduledJson) : [];
-      const updatedScheduledLocks = [...existingScheduledLocks, newScheduledLock];
-      await AsyncStorage.setItem(SCHEDULED_LOCKS_STORAGE_KEY, JSON.stringify(updatedScheduledLocks));
+      // Save to storage
+      console.log('[AppsScreen] Saving schedule to storage');
+      const scheduleId = await scheduleManager.addSchedule(selectedApps, modalScheduleConfig);
+      console.log('[AppsScreen] Schedule saved with ID:', scheduleId);
       
-      Alert.alert("Schedule Set", `Apps scheduled successfully.`);
-      console.log('Scheduled lock saved:', newScheduledLock);
+      // Reload schedules to sync with native module
+      console.log('[AppsScreen] Reloading schedules to sync');
+      await loadSchedules();
+      
+      Alert.alert("Schedule Set", "Your schedule has been saved and synced.");
+      
+      // Clear UI state
       setIsScheduleModalVisible(false);
       setSelectedAppsUI(new Set());
-      AsyncStorage.removeItem(SELECTED_APPS_UI_STORAGE_KEY);
     } catch (error) {
-      console.error('Failed to save scheduled lock:', error);
-      Alert.alert("Error", "Failed to schedule apps. Please try again.");
-      setIsScheduleModalVisible(false); // Close modal even on error
+      console.error('[AppsScreen] Failed to save schedule:', error);
+      Alert.alert(
+        "Error",
+        "Failed to save the schedule. Please try again."
+      );
     }
   };
 

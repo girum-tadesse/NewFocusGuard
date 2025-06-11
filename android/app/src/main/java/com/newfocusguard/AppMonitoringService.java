@@ -38,10 +38,20 @@ import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.HeadlessJsTaskService;
 
 import org.json.JSONObject;
+import org.json.JSONArray;
+import org.json.JSONException;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
+import java.util.TimeZone;
+import java.util.Arrays;
 
 public class AppMonitoringService extends Service {
     private static final String TAG = "AppMonitoringService";
@@ -50,12 +60,14 @@ public class AppMonitoringService extends Service {
     private static final int NOTIFICATION_ID = 1867;
     private static final String PREFS_NAME = "FocusGuardLocks";
     private static final String PREFS_KEY = "lockedAppsMap";
+    private static final String PREFS_KEY_SCHEDULES = "schedulesJson";
 
     private Handler handler;
     private boolean isRunning = false;
     private String lastForegroundApp = "";
     private UsageStatsManager usageStatsManager;
     private Map<String, Long> lockedApps = new HashMap<>();
+    private List<ScheduledLock> scheduledLocks = new ArrayList<>();
 
     private WindowManager windowManager;
     private View overlayView;
@@ -67,6 +79,7 @@ public class AppMonitoringService extends Service {
         super.onCreate();
         Log.d(TAG, "Service onCreate");
         loadLockedApps();
+        loadSchedules();
         createNotificationChannel();
         handler = new Handler(Looper.getMainLooper());
         usageStatsManager = (UsageStatsManager) getSystemService(Context.USAGE_STATS_SERVICE);
@@ -122,6 +135,22 @@ public class AppMonitoringService extends Service {
                             stopMonitoring();
                         }
                         break;
+                    case "SET_SCHEDULES":
+                        String schedulesJson = intent.getStringExtra("schedulesJson");
+                        Log.d(TAG, "Received SET_SCHEDULES action.");
+                        
+                        // Persist schedules so they survive service restarts
+                        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                        prefs.edit().putString(PREFS_KEY_SCHEDULES, schedulesJson).apply();
+                        Log.d(TAG, "Saved schedules to SharedPreferences.");
+
+                        updateSchedules(schedulesJson);
+
+                        // Ensure monitoring is active if we just set a schedule
+                        if (!isRunning) {
+                            startMonitoring();
+                        }
+                        break;
                     default:
                         Log.w(TAG, "Received unknown action: " + action);
                         if (!isRunning) {
@@ -152,9 +181,9 @@ public class AppMonitoringService extends Service {
         super.onDestroy();
         stopMonitoring();
         
-        // If we still have locked apps, schedule a restart
-        if (!lockedApps.isEmpty()) {
-            Log.d(TAG, "Service destroyed but we still have locked apps. Setting up restart...");
+        // If we still have locked apps or schedules, schedule a restart
+        if (!lockedApps.isEmpty() || !scheduledLocks.isEmpty()) {
+            Log.d(TAG, "Service destroyed but we still have work to do. Setting up restart...");
             scheduleServiceRestart();
         }
     }
@@ -164,9 +193,9 @@ public class AppMonitoringService extends Service {
         Log.d(TAG, "onTaskRemoved called. App was swiped away.");
         super.onTaskRemoved(rootIntent);
         
-        // If we still have locked apps, schedule a restart
-        if (!lockedApps.isEmpty()) {
-            Log.d(TAG, "Task removed but we still have locked apps. Setting up restart...");
+        // If we still have locked apps or schedules, schedule a restart
+        if (!lockedApps.isEmpty() || !scheduledLocks.isEmpty()) {
+            Log.d(TAG, "Task removed but we still have work to do. Setting up restart...");
             scheduleServiceRestart();
         }
     }
@@ -243,6 +272,9 @@ public class AppMonitoringService extends Service {
             @Override
             public void run() {
                 if (!isRunning) return;
+
+                checkScheduledLocks();
+
                 String currentApp = getCurrentForegroundApp();
                 if (currentApp != null && !currentApp.equals(lastForegroundApp)) {
                     Log.d(TAG, "Foreground app changed from: " + lastForegroundApp + " to: " + currentApp);
@@ -551,5 +583,205 @@ public class AppMonitoringService extends Service {
                 notificationManager.createNotificationChannel(channel);
             }
         }
+    }
+
+    private void updateSchedules(String jsonString) {
+        if (jsonString == null) {
+            Log.w(TAG, "Received null JSON string for schedules.");
+            return;
+        }
+        try {
+            JSONArray jsonArray = new JSONArray(jsonString);
+            scheduledLocks.clear();
+            for (int i = 0; i < jsonArray.length(); i++) {
+                JSONObject jsonObject = jsonArray.getJSONObject(i);
+                // Simple parsing, assuming structure from JS. Robust parsing would be needed for production.
+                ScheduledLock lock = new ScheduledLock(jsonObject);
+                if (lock.isEnabled) {
+                    scheduledLocks.add(lock);
+                }
+            }
+            Log.d(TAG, "Successfully parsed and updated " + scheduledLocks.size() + " schedules.");
+        } catch (JSONException e) {
+            Log.e(TAG, "Failed to parse schedules JSON.", e);
+        }
+    }
+    
+    private void checkScheduledLocks() {
+        if (scheduledLocks.isEmpty()) {
+            Log.d(TAG, "No schedules to check");
+            return;
+        }
+
+        Calendar now = Calendar.getInstance(TimeZone.getDefault());
+        int dayOfWeek = now.get(Calendar.DAY_OF_WEEK); // Sunday = 1, Saturday = 7
+        int currentHour = now.get(Calendar.HOUR_OF_DAY);
+        int currentMinute = now.get(Calendar.MINUTE);
+
+        Log.d(TAG, String.format("Checking schedules at day %d, time %02d:%02d", dayOfWeek, currentHour, currentMinute));
+
+        for (ScheduledLock schedule : scheduledLocks) {
+            Log.d(TAG, "Checking schedule: " + schedule.id);
+            Log.d(TAG, String.format("Schedule times: %02d:%02d - %02d:%02d", 
+                schedule.startHour, schedule.startMinute, schedule.endHour, schedule.endMinute));
+            Log.d(TAG, "Selected days: " + Arrays.toString(schedule.selectedDays));
+            
+            if (schedule.isTimeWithinSchedule(now, dayOfWeek, currentHour, currentMinute)) {
+                Log.d(TAG, "Schedule is active now");
+                for (String packageName : schedule.appPackageNames) {
+                    // If app is within a schedule, lock it "indefinitely" (-1L)
+                    // The lock will be lifted when it's no longer within the schedule.
+                    if (!isAppLocked(packageName)) {
+                        Log.d(TAG, "Scheduled lock activating for: " + packageName);
+                        lockedApps.put(packageName, -1L);
+                    }
+                }
+            } else {
+                Log.d(TAG, "Schedule is not active now");
+                // If the app is NOT within schedule anymore, but was previously locked by a schedule
+                for (String packageName : schedule.appPackageNames) {
+                    if (isAppLocked(packageName) && lockedApps.get(packageName) == -1L) {
+                        Log.d(TAG, "Scheduled lock de-activating for: " + packageName);
+                        lockedApps.remove(packageName);
+                        if (packageName.equals(currentlyOverlayingPackage)) {
+                            hideNativeOverlay();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void loadSchedules() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        String schedulesJson = prefs.getString(PREFS_KEY_SCHEDULES, null);
+        Log.d(TAG, "Loading schedules from SharedPreferences.");
+        updateSchedules(schedulesJson);
+    }
+}
+
+// Helper class to represent a scheduled lock
+class ScheduledLock {
+    private static final String TAG = "ScheduledLock";
+    String id;
+    List<String> appPackageNames = new ArrayList<>();
+    boolean isEnabled;
+    // We will simplify time storage for native side
+    int startHour, startMinute, endHour, endMinute;
+    boolean[] selectedDays = new boolean[7]; // Sun, Mon, Tue, Wed, Thu, Fri, Sat
+
+    ScheduledLock(JSONObject jsonObject) throws JSONException {
+        this.id = jsonObject.getString("id");
+        this.isEnabled = jsonObject.getBoolean("isEnabled");
+        
+        JSONArray packages = jsonObject.getJSONArray("appPackageNames");
+        for(int i=0; i<packages.length(); i++) {
+            appPackageNames.add(packages.getString(i));
+        }
+        
+        JSONObject scheduleConfig = jsonObject.getJSONObject("scheduleConfig");
+        
+        // Dates are parsed as ISO-8601 strings e.g., "2024-06-05T09:00:00.000Z"
+        String startTimeStr = scheduleConfig.getString("startTime");
+        String endTimeStr = scheduleConfig.getString("endTime");
+
+        try {
+            // Dates are parsed as ISO-8601 strings (e.g., "2024-06-05T09:00:00.000Z") from JS, which are in UTC.
+            // We need to convert them to the phone's local timezone for correct time comparison.
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+            sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
+
+            Date startDate = sdf.parse(startTimeStr);
+            Date endDate = sdf.parse(endTimeStr);
+
+            Calendar cal = Calendar.getInstance(); // Gets calendar in local timezone
+
+            cal.setTime(startDate);
+            this.startHour = cal.get(Calendar.HOUR_OF_DAY);
+            this.startMinute = cal.get(Calendar.MINUTE);
+
+            cal.setTime(endDate);
+            this.endHour = cal.get(Calendar.HOUR_OF_DAY);
+            this.endMinute = cal.get(Calendar.MINUTE);
+            
+            Log.d(TAG, "Parsed schedule " + this.id + ": Local start " + this.startHour + ":" + this.startMinute + ", end " + this.endHour + ":" + this.endMinute);
+
+        } catch (ParseException e) {
+            Log.e(TAG, "Failed to parse date string for schedule " + this.id, e);
+            // Fallback to incorrect simple parsing to avoid crash, though schedule will be wrong.
+            this.startHour = Integer.parseInt(startTimeStr.substring(11, 13));
+            this.startMinute = Integer.parseInt(startTimeStr.substring(14, 16));
+            this.endHour = Integer.parseInt(endTimeStr.substring(11, 13));
+            this.endMinute = Integer.parseInt(endTimeStr.substring(14, 16));
+        }
+
+        JSONArray days = scheduleConfig.getJSONArray("selectedDays");
+        // The JS boolean array is [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
+        // The Java Calendar day of week is [Sun=1, Mon=2, ..., Sat=7]
+        // We will align our array to match Calendar: index 0=Sun, 1=Mon, etc.
+        this.selectedDays = new boolean[8]; // Using 1-based indexing for days
+        this.selectedDays[2] = days.getBoolean(0); // Mon
+        this.selectedDays[3] = days.getBoolean(1); // Tue
+        this.selectedDays[4] = days.getBoolean(2); // Wed
+        this.selectedDays[5] = days.getBoolean(3); // Thu
+        this.selectedDays[6] = days.getBoolean(4); // Fri
+        this.selectedDays[7] = days.getBoolean(5); // Sat
+        this.selectedDays[1] = days.getBoolean(6); // Sun
+    }
+    
+    boolean isTimeWithinSchedule(Calendar now, int dayOfWeek, int currentHour, int currentMinute) {
+        // Check if any days are selected
+        boolean anyDaySelected = false;
+        for (int i = 1; i < selectedDays.length; i++) {  // Start from 1 since we use 1-based indexing
+            if (selectedDays[i]) {
+                anyDaySelected = true;
+                break;
+            }
+        }
+
+        // If no days are selected, treat all days as selected
+        if (!anyDaySelected) {
+            Log.d(TAG, "No days selected, treating all days as active");
+            // Create array with 8 elements to match 1-based indexing
+            selectedDays = new boolean[8];
+            for (int i = 1; i < 8; i++) {  // Fill indices 1-7 with true
+                selectedDays[i] = true;
+            }
+        }
+
+        // Check if the schedule is active for the current day of the week
+        int currentTimeInMinutes = currentHour * 60 + currentMinute;
+        int startTimeInMinutes = startHour * 60 + startMinute;
+        int endTimeInMinutes = endHour * 60 + endMinute;
+
+        Log.d(TAG, String.format("Checking schedule: day=%d, current=%02d:%02d, start=%02d:%02d, end=%02d:%02d",
+            dayOfWeek, currentHour, currentMinute, startHour, startMinute, endHour, endMinute));
+        Log.d(TAG, "Selected days: " + Arrays.toString(selectedDays));
+
+        boolean isOvernight = startTimeInMinutes > endTimeInMinutes;
+
+        if (isOvernight) {
+            // Overnight schedule, e.g., Mon 10 PM - Tue 2 AM
+            // Check if current time is after start time on the selected day
+            if (selectedDays[dayOfWeek] && currentTimeInMinutes >= startTimeInMinutes) {
+                Log.d(TAG, "Schedule active - overnight, after start time");
+                return true;
+            }
+            // Check if current time is before end time on the day AFTER the selected day
+            int previousDayOfWeek = (dayOfWeek == 1) ? 7 : dayOfWeek - 1;
+            if (selectedDays[previousDayOfWeek] && currentTimeInMinutes < endTimeInMinutes) {
+                Log.d(TAG, "Schedule active - overnight, before end time next day");
+                return true;
+            }
+        } else {
+            // Same-day schedule
+            if (selectedDays[dayOfWeek] && currentTimeInMinutes >= startTimeInMinutes && currentTimeInMinutes < endTimeInMinutes) {
+                Log.d(TAG, "Schedule active - same day schedule");
+                return true;
+            }
+        }
+        
+        Log.d(TAG, "Schedule not active at this time");
+        return false;
     }
 }

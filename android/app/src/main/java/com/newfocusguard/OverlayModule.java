@@ -54,6 +54,16 @@ public class OverlayModule extends ReactContextBaseJavaModule implements Lifecyc
     }
 
     @ReactMethod
+    public void addListener(String eventName) {
+        // Keep: Required for RN built in Event Emitter
+    }
+
+    @ReactMethod
+    public void removeListeners(int count) {
+        // Keep: Required for RN built in Event Emitter
+    }
+
+    @ReactMethod
     public void showOverlay(final String appName, final String timeRemaining, final int emergencyUnlockChances, final String quote) {
         if (isOverlayShowing) {
             return;

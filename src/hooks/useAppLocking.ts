@@ -23,15 +23,18 @@ export const useAppLocking = () => {
     setupMonitoring();
     
     return () => {
-      monitoringService.cleanup();
+      // Intentionally not calling monitoringService.cleanup() here.
+      // The service should persist in the background to handle scheduled locks
+      // even when the component that initiated it unmounts.
+      // The native Android lifecycle methods (onTaskRemoved, onDestroy) will handle
+      // service restarts if needed.
     };
   }, []);
 
   const setupMonitoring = async () => {
-    const hasPermission = await monitoringService.ensureUsageStatsPermission();
-    if (hasPermission) {
-      monitoringService.startMonitoring();
-    }
+    // The native startMonitoring method will internally check and prompt for
+    // permissions if they are not already granted.
+    monitoringService.startMonitoring();
   };
 
   const loadLockedApps = async () => {

@@ -18,8 +18,11 @@ export interface ScheduleConfig {
 
 export interface ScheduledLock {
   id: string; // Unique identifier for the schedule
+  userId: string; // Firebase Auth user ID
   appPackageNames: string[];
   scheduleConfig: ScheduleConfig;
   isEnabled: boolean;
-  createdAt: number; // Unix timestamp (milliseconds) for when the schedule was created
+  // This will be a server-generated timestamp upon creation.
+  // When read from Firestore, it will be a Timestamp object, which can be converted to a Date.
+  createdAt: any; 
 } 

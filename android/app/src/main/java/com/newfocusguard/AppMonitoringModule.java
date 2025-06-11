@@ -12,6 +12,8 @@ import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.module.annotations.ReactModule;
+import com.facebook.react.modules.core.DeviceEventManagerModule;
+import com.facebook.react.bridge.WritableMap;
 
 @ReactModule(name = AppMonitoringModule.NAME)
 public class AppMonitoringModule extends ReactContextBaseJavaModule {
@@ -29,6 +31,16 @@ public class AppMonitoringModule extends ReactContextBaseJavaModule {
     @Override
     public String getName() {
         return NAME;
+    }
+
+    @ReactMethod
+    public void addListener(String eventName) {
+        // Set up any upstream listeners or background tasks as necessary
+    }
+
+    @ReactMethod
+    public void removeListeners(Integer count) {
+        // Remove upstream listeners, stop unnecessary background tasks
     }
 
     @ReactMethod
@@ -118,6 +130,21 @@ public class AppMonitoringModule extends ReactContextBaseJavaModule {
         }
     }
 
+    @ReactMethod
+    public void setScheduledLocks(String schedulesJson, Promise promise) {
+        try {
+            Intent scheduleIntent = new Intent(reactContext, AppMonitoringService.class);
+            scheduleIntent.setAction("SET_SCHEDULES");
+            scheduleIntent.putExtra("schedulesJson", schedulesJson);
+            reactContext.startService(scheduleIntent);
+            Log.d(TAG, "Sent SET_SCHEDULES intent with data.");
+            promise.resolve(null);
+        } catch (Exception e) {
+            Log.e(TAG, "Error sending SET_SCHEDULES intent.", e);
+            promise.reject("SCHEDULE_ERROR", e.getMessage(), e);
+        }
+    }
+
     private boolean hasUsageStatsPermission() {
         Log.d(TAG, "Native: hasUsageStatsPermission() called");
         try {
@@ -141,5 +168,11 @@ public class AppMonitoringModule extends ReactContextBaseJavaModule {
             Log.e(TAG, "Native: Exception in hasUsageStatsPermission()", e);
             return false;
         }
+    }
+
+    private void sendEvent(String eventName, WritableMap params) {
+        reactContext
+            .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+            .emit(eventName, params);
     }
 } 
