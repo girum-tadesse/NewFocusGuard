@@ -113,157 +113,111 @@ export default function AppsScreen() {
     }
   };
 
-  // Helper function for Usage Stats part
-  const checkAndRequestUsageStats = async () => {
-    console.log("[Permissions] Entering checkAndRequestUsageStats - User will always be prompted to check settings.");
-    try {
-      // We still log the current status for debugging, but the prompt will always show.
-      const hasUsagePermission = await AppMonitoringModule.hasUsageStatsPermission();
-      console.log("[Permissions] Current usage stats permission status (for logging):", hasUsagePermission);
-
-      Alert.alert(
-        "Step 2: Check Usage Access Permission",
-        "FocusGuard also needs usage access to monitor and lock apps. Please tap 'Go to Settings' to check or grant this permission.",
-        [
-          {
-            text: "Go to Settings",
-            onPress: async () => {
-              console.log("[Permissions] User pressed 'Go to Settings' for Usage Access.");
-              await AppMonitoringModule.requestUsageStatsPermission(); // Opens settings
-              // Optional: Re-check and inform, but primary goal is to take them to settings.
-              const usageGrantedAfterSettings = await AppMonitoringModule.hasUsageStatsPermission();
-              console.log("[Permissions] Usage stats permission status after settings visit (for logging):", usageGrantedAfterSettings);
-              if (!usageGrantedAfterSettings) {
-                Alert.alert("Usage Access Still Needed", "If you didn't grant Usage Access, some features might not work correctly.");
-              }
-            }
-          },
-          {
-            text: "Skip for Now",
-            style: "cancel",
-            onPress: () => {
-              console.log("[Permissions] User skipped Usage Access settings check.");
-              Alert.alert("Usage Access Skipped", "If Usage Access is not enabled, app monitoring and locking may not function.");
-            }
-          }
-        ]
-      );
-    } catch (error) {
-      console.error('Error in checkAndRequestUsageStats:', error);
-      Alert.alert("Error", "Could not process Usage Access permission check.");
-    }
-  };
-
   const checkAndRequestPermissions = async () => {
     console.log("[Permissions] Starting permission setup flow");
+  
     try {
-      // Show initial welcome message
+      // First, check if permissions are already granted.
+      const overlayGranted = await checkOverlayPermission();
+      // Note: hasUsageStatsPermission is now async, so we await it.
+      const usageGranted = await AppMonitoringModule.hasUsageStatsPermission();
+  
+      if (overlayGranted && usageGranted) {
+        console.log("[Permissions] All permissions are already granted.");
+        return; // All permissions are in place, no need to ask.
+      }
+  
+      // Use a promise to wait for the user to interact with the initial alert.
+      const userAgreed = await new Promise(resolve => {
+        Alert.alert(
+          "Welcome to FocusGuard!",
+          "To help you stay focused, we need two permissions. We'll guide you through setting them up step by step.",
+          [
+            { text: "Let's Start", onPress: () => resolve(true) },
+            { text: "Maybe Later", style: "cancel", onPress: () => resolve(false) },
+          ],
+          { cancelable: false }
+        );
+      });
+  
+      if (!userAgreed) {
+        console.log("[Permissions] User declined the permission setup flow.");
+        Alert.alert(
+          "Permissions Required",
+          "Please note that FocusGuard requires these permissions to function correctly. You can grant them later from the settings."
+        );
+        return;
+      }
+  
+      // --- Step 1: Overlay Permission ---
+      if (!overlayGranted) {
+        console.log("[Permissions] Requesting Overlay permission.");
+        // Use a promise to wait for the user to proceed after the explanation.
+        await new Promise<void>(resolve => {
+          Alert.alert(
+            "Step 1 of 2: Display Over Other Apps",
+            "This permission is needed to show the lock screen over other applications when a timer is up.",
+            [
+              {
+                text: "Open Settings",
+                onPress: async () => {
+                  await requestOverlayPermission();
+                  // We resolve here to move to the next step. We can't know if the user
+                  // granted it, but we've guided them. We'll check again if needed.
+                  resolve();
+                },
+              },
+            ],
+            { cancelable: false }
+          );
+        });
+      }
+  
+      // --- Brief transition for better UX ---
+      await new Promise<void>(resolve => {
+        Alert.alert(
+          "Great!",
+          "Now for the final permission.",
+          [{ text: "Continue", onPress: () => resolve() }]
+        );
+      });
+  
+      // --- Step 2: Usage Stats Permission ---
+      // Re-check usage stats in case it was granted in a previous session
+      const usageGrantedAfterOverlay = await AppMonitoringModule.hasUsageStatsPermission();
+      if (!usageGrantedAfterOverlay) {
+        console.log("[Permissions] Requesting Usage Stats permission.");
+        await new Promise<void>(resolve => {
+          Alert.alert(
+            "Step 2 of 2: Usage Access",
+            "This permission allows FocusGuard to see which app is currently running to know when to lock it.",
+            [
+              {
+                text: "Open Settings",
+                onPress: async () => {
+                  await AppMonitoringModule.requestUsageStatsPermission();
+                  // As before, we resolve to signal completion of this step.
+                  resolve();
+                },
+              },
+            ],
+            { cancelable: false }
+          );
+        });
+      }
+  
+      // --- Final Confirmation ---
       Alert.alert(
-        "Welcome to FocusGuard!",
-        "To help you stay focused, we need two permissions. We'll guide you through setting these up step by step.",
-        [
-          {
-            text: "Let's Start",
-            onPress: async () => {
-              try {
-                // 1. Handle Overlay Permission FIRST
-                console.log("[Permissions] Starting overlay permission flow");
-                await new Promise<void>((resolve) => {
-                  Alert.alert(
-                    "Step 1 of 2: Display Over Other Apps",
-                    "First, we need permission to show the lock screen when you try to open a locked app.\n\nOn the next screen, find FocusGuard in the list and turn on 'Allow display over other apps'.",
-                    [
-                      {
-                        text: "Open Settings",
-                        onPress: async () => {
-                          try {
-                            console.log("[Permissions] User proceeding to overlay settings");
-                            await requestOverlayPermission();
-                            const overlayGranted = await checkOverlayPermission();
-                            console.log("[Permissions] Overlay permission status:", overlayGranted);
-                            
-                            if (!overlayGranted) {
-                              Alert.alert(
-                                "Permission Not Detected",
-                                "The 'Display over other apps' permission appears to be off. Some features may not work correctly.",
-                                [{ text: "Continue to Next Step", onPress: () => resolve() }]
-                              );
-                            } else {
-                              Alert.alert(
-                                "Permission Granted",
-                                "Display over other apps permission is set up successfully.",
-                                [{ text: "Continue to Next Step", onPress: () => resolve() }]
-                              );
-                            }
-                          } catch (error) {
-                            console.error("[Permissions] Error in overlay setup:", error);
-                            resolve(); // Continue to next step even if there's an error
-                          }
-                        }
-                      }
-                    ],
-                    { cancelable: false }
-                  );
-                });
-
-                // 2. Handle Usage Stats Permission
-                console.log("[Permissions] Starting usage stats permission flow");
-                await new Promise<void>((resolve) => {
-                  Alert.alert(
-                    "Step 2 of 2: Usage Access",
-                    "Next, we need permission to detect when you open a locked app.\n\nOn the next screen, find FocusGuard in the list and turn on 'Permit usage access'.",
-                    [
-                      {
-                        text: "Open Settings",
-                        onPress: async () => {
-                          try {
-                            console.log("[Permissions] User proceeding to usage access settings");
-                            await AppMonitoringModule.requestUsageStatsPermission();
-                            const usageGranted = await AppMonitoringModule.hasUsageStatsPermission();
-                            console.log("[Permissions] Usage access permission status:", usageGranted);
-                            
-                            if (!usageGranted) {
-                              Alert.alert(
-                                "Permission Not Detected",
-                                "The Usage Access permission appears to be off. Some features may not work correctly.",
-                                [{ text: "Finish Setup", onPress: () => resolve() }]
-                              );
-                            } else {
-                              Alert.alert(
-                                "Setup Complete!",
-                                "Great! FocusGuard is now ready to help you stay focused.",
-                                [{ text: "Start Using FocusGuard", onPress: () => resolve() }]
-                              );
-                            }
-                          } catch (error) {
-                            console.error("[Permissions] Error in usage stats setup:", error);
-                            resolve(); // Continue even if there's an error
-                          }
-                        }
-                      }
-                    ],
-                    { cancelable: false }
-                  );
-                });
-              } catch (error) {
-                console.error("[Permissions] Error in permission flow:", error);
-                // Show error but don't prevent the app from being used
-                Alert.alert(
-                  "Permission Setup Issue",
-                  "There was an issue during permission setup. You can try setting permissions again from the app settings.",
-                  [{ text: "OK" }]
-                );
-              }
-            }
-          }
-        ],
-        { cancelable: false }
+        "Setup Complete!",
+        "Thank you! FocusGuard is now ready to help you stay focused. You can always manage permissions in your phone's settings.",
+        [{ text: "Got it!" }]
       );
+  
     } catch (error) {
-      console.error('[Permissions] Error in permission setup:', error);
+      console.error('[Permissions] Error during permission setup flow:', error);
       Alert.alert(
         "Setup Error",
-        "There was an error during the permission setup. Please try again later."
+        "An unexpected error occurred during permission setup. Please try again or contact support if the problem persists."
       );
     }
   };

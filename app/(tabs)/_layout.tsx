@@ -9,7 +9,6 @@ import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 // Or, if you have an `apps.tsx`, Expo Router would use that for an `/apps` route.
 // When using a custom navigator like `createMaterialTopTabNavigator`,
 // we explicitly provide the component for each tab.
-import { TestOverlayScreen } from '@/src/screens/TestOverlayScreen'; // Import the test screen
 import AppsScreen from './index'; // Assuming your app/(tabs)/index.tsx is the Apps screen content
 
 const PURE_WHITE = '#FFFFFF';
@@ -24,6 +23,16 @@ const LockedScreenPlaceholder = () => (
 const ScheduledScreenPlaceholder = () => (
   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: PURE_WHITE }}>
     <Text style={{color: DARK_TEXT_COLOR}}>Scheduled Screen Content</Text>
+  </View>
+);
+const ChatScreenPlaceholder = () => (
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: PURE_WHITE }}>
+    <Text style={{color: DARK_TEXT_COLOR}}>Chat Screen Content</Text>
+  </View>
+);
+const SettingsScreenPlaceholder = () => (
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: PURE_WHITE }}>
+    <Text style={{color: DARK_TEXT_COLOR}}>Settings Screen Content</Text>
   </View>
 );
 
@@ -53,7 +62,10 @@ export default function TabLayout() {
         screenOptions={{
           tabBarActiveTintColor: activeTintColor,
           tabBarInactiveTintColor: inactiveTintColor,
-          tabBarLabelStyle: { fontWeight: 'bold', fontSize: 14 },
+          tabBarLabelStyle: { 
+            fontWeight: 'bold', 
+            fontSize: 12,
+          },
           tabBarStyle: {
             backgroundColor: PURE_WHITE,
             elevation: 0, // Remove shadow on Android
@@ -64,6 +76,11 @@ export default function TabLayout() {
           tabBarIndicatorStyle: {
             backgroundColor: activeTintColor, // Underline color for active tab
             height: 3, // Thickness of the underline
+          },
+          tabBarScrollEnabled: true,
+          tabBarItemStyle: {
+            paddingHorizontal: 10, // Reduced horizontal padding between tabs
+            width: 'auto', // Let the width adjust to content
           },
         }}
       >
@@ -83,9 +100,14 @@ export default function TabLayout() {
           options={{ tabBarLabel: 'SCHEDULED' }}
         />
         <Tab.Screen 
-          name="test"
-          component={TestOverlayScreen}
-          options={{ tabBarLabel: 'TEST' }}
+          name="chat"
+          component={ChatScreenPlaceholder}
+          options={{ tabBarLabel: 'CHAT' }}
+        />
+        <Tab.Screen 
+          name="settings"
+          component={SettingsScreenPlaceholder}
+          options={{ tabBarLabel: 'SETTINGS' }}
         />
       </Tab.Navigator>
     </SafeAreaView>
@@ -107,7 +129,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 'bold',
     // color is set dynamically by theme
   },
