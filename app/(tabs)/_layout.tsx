@@ -9,6 +9,7 @@ import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 // Or, if you have an `apps.tsx`, Expo Router would use that for an `/apps` route.
 // When using a custom navigator like `createMaterialTopTabNavigator`,
 // we explicitly provide the component for each tab.
+import ChatScreen from './chat'; // Import the new chat screen
 import AppsScreen from './index'; // Assuming your app/(tabs)/index.tsx is the Apps screen content
 
 const PURE_WHITE = '#FFFFFF';
@@ -101,7 +102,7 @@ export default function TabLayout() {
         />
         <Tab.Screen 
           name="chat"
-          component={ChatScreenPlaceholder}
+          component={ChatScreen}
           options={{ tabBarLabel: 'CHAT' }}
         />
         <Tab.Screen 
@@ -123,6 +124,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12, 
+    marginBottom: 20,
     // backgroundColor is set dynamically by theme
   },
   headerIcon: {

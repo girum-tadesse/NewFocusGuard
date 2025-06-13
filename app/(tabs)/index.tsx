@@ -129,10 +129,10 @@ export default function AppsScreen() {
   
       // Use a promise to wait for the user to interact with the initial alert.
       const userAgreed = await new Promise(resolve => {
-        Alert.alert(
-          "Welcome to FocusGuard!",
+      Alert.alert(
+        "Welcome to FocusGuard!",
           "To help you stay focused, we need two permissions. We'll guide you through setting them up step by step.",
-          [
+        [
             { text: "Let's Start", onPress: () => resolve(true) },
             { text: "Maybe Later", style: "cancel", onPress: () => resolve(false) },
           ],
@@ -154,21 +154,21 @@ export default function AppsScreen() {
         console.log("[Permissions] Requesting Overlay permission.");
         // Use a promise to wait for the user to proceed after the explanation.
         await new Promise<void>(resolve => {
-          Alert.alert(
-            "Step 1 of 2: Display Over Other Apps",
+                  Alert.alert(
+                    "Step 1 of 2: Display Over Other Apps",
             "This permission is needed to show the lock screen over other applications when a timer is up.",
-            [
-              {
-                text: "Open Settings",
-                onPress: async () => {
-                  await requestOverlayPermission();
+                    [
+                      {
+                        text: "Open Settings",
+                        onPress: async () => {
+                            await requestOverlayPermission();
                   // We resolve here to move to the next step. We can't know if the user
                   // granted it, but we've guided them. We'll check again if needed.
                   resolve();
                 },
               },
-            ],
-            { cancelable: false }
+                    ],
+                    { cancelable: false }
           );
         });
       }
@@ -179,39 +179,39 @@ export default function AppsScreen() {
           "Great!",
           "Now for the final permission.",
           [{ text: "Continue", onPress: () => resolve() }]
-        );
-      });
-  
+                  );
+                });
+
       // --- Step 2: Usage Stats Permission ---
       // Re-check usage stats in case it was granted in a previous session
       const usageGrantedAfterOverlay = await AppMonitoringModule.hasUsageStatsPermission();
       if (!usageGrantedAfterOverlay) {
         console.log("[Permissions] Requesting Usage Stats permission.");
         await new Promise<void>(resolve => {
-          Alert.alert(
-            "Step 2 of 2: Usage Access",
+                  Alert.alert(
+                    "Step 2 of 2: Usage Access",
             "This permission allows FocusGuard to see which app is currently running to know when to lock it.",
-            [
-              {
-                text: "Open Settings",
-                onPress: async () => {
-                  await AppMonitoringModule.requestUsageStatsPermission();
+                    [
+                      {
+                        text: "Open Settings",
+                        onPress: async () => {
+                            await AppMonitoringModule.requestUsageStatsPermission();
                   // As before, we resolve to signal completion of this step.
                   resolve();
                 },
               },
-            ],
-            { cancelable: false }
-          );
-        });
+                    ],
+                    { cancelable: false }
+                  );
+                });
       }
   
       // --- Final Confirmation ---
-      Alert.alert(
+                Alert.alert(
         "Setup Complete!",
         "Thank you! FocusGuard is now ready to help you stay focused. You can always manage permissions in your phone's settings.",
         [{ text: "Got it!" }]
-      );
+                );
   
     } catch (error) {
       console.error('[Permissions] Error during permission setup flow:', error);
@@ -361,13 +361,14 @@ export default function AppsScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ThemedView style={styles.container}>
         <View style={styles.searchBarContainer}>
-          <MaterialIcons name="search" size={24} color="#888" style={styles.searchIcon} />
+          <MaterialIcons name="search" size={20} color="#666" />
           <TextInput
-            style={styles.searchBar}
+            style={styles.searchInput}
             placeholder="Search apps..."
             placeholderTextColor="#888"
             value={searchQuery}
             onChangeText={setSearchQuery}
+            underlineColorAndroid="transparent"
           />
         </View>
 
@@ -394,16 +395,18 @@ export default function AppsScreen() {
             }
           />
         )}
-
-        <View style={styles.buttonsContainer}>
-          <TouchableOpacity style={styles.lockNowButton} onPress={handleOpenLockNowModal}>
-            <ThemedText style={styles.buttonText}>LOCK NOW</ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.scheduleButton} onPress={handleOpenScheduleModal}>
-            <ThemedText style={styles.buttonText}>SCHEDULE</ThemedText>
-          </TouchableOpacity>
-        </View>
       </ThemedView>
+
+      <View style={styles.floatingContainer}>
+        <TouchableOpacity style={styles.floatingButton} onPress={handleOpenScheduleModal}>
+          <MaterialIcons name="schedule" size={16} color="#FFFFFF" />
+          <ThemedText style={styles.floatingButtonText}>SCHEDULE</ThemedText>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.floatingButton} onPress={handleOpenLockNowModal}>
+          <MaterialIcons name="lock" size={16} color="#FFFFFF" />
+          <ThemedText style={styles.floatingButtonText}>LOCK NOW</ThemedText>
+        </TouchableOpacity>
+      </View>
 
       <ScheduleModal
         isVisible={isScheduleModalVisible}
@@ -441,10 +444,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF', 
-    borderRadius: 25, 
+    borderRadius: 16, 
     paddingHorizontal: 15,
-    paddingVertical: 10,
-    marginBottom: 20,
+    paddingVertical: 2,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#E0E0E0', 
     shadowColor: '#000',
@@ -453,13 +456,13 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchBar: {
+  searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 13,
     color: '#333',
+    marginLeft: 8,
+    padding: 0,
+    backgroundColor: 'transparent',
   },
   appList: {
     flex: 1,
@@ -481,37 +484,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center'
   },
-  buttonsContainer: {
+  floatingContainer: {
+    position: 'absolute',
+    bottom: 20,
+    right: 0,
+    left: 0,
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    backgroundColor: PURE_WHITE,
+    justifyContent: 'space-evenly',
+    alignItems: 'center',
   },
-  lockNowButton: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: '#FF7757',
+  floatingButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    backgroundColor: '#FF7757',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
-  scheduleButton: {
-    backgroundColor: '#FFFFFF', 
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: '#FF7757', 
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  floatingButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginLeft: 5,
   },
 });

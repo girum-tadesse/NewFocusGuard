@@ -38,7 +38,7 @@ export const AppCard: React.FC<AppCardProps> = ({
             style={styles.icon}
           />
         ) : (
-          <MaterialIcons name="android" size={40} color="#666" />
+          <MaterialIcons name="android" size={32} color="#666" />
         )}
         <Text style={styles.name} numberOfLines={1}>{app.name}</Text>
       </View>
@@ -49,19 +49,19 @@ export const AppCard: React.FC<AppCardProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    margin: 4,
-    padding: 8,
+    margin: 3,
+    padding: 6,
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 10,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 3,
     alignItems: 'center',
     justifyContent: 'space-between',
-    minWidth: 80,
-    maxWidth: 120,
+    minWidth: 70,
+    maxWidth: 100,
   },
   lockedContainer: {
     backgroundColor: '#FFF8F8',
@@ -78,15 +78,15 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   icon: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    marginBottom: 4,
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    marginBottom: 3,
   },
   name: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#333',
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: 3,
   },
 }); 
