@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   activeIndicator: {
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#FF7757',
     width: 24,
   },
   mainButton: {

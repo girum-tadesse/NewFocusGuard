@@ -9,33 +9,37 @@ import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 // Or, if you have an `apps.tsx`, Expo Router would use that for an `/apps` route.
 // When using a custom navigator like `createMaterialTopTabNavigator`,
 // we explicitly provide the component for each tab.
+import AnalyticsScreen from './analytics'; // Import the Analytics screen
 import ChatScreen from './chat'; // Import the new chat screen
 import AppsScreen from './index'; // Assuming your app/(tabs)/index.tsx is the Apps screen content
+import LockedScreen from './locked'; // Import the actual LockedScreen component
+import ScheduledScreen from './scheduled'; // Import the actual ScheduledScreen component (renamed from placeholder)
+import SettingsScreen from './settings'; // Import the actual SettingsScreen component (renamed from placeholder)
 
 const PURE_WHITE = '#FFFFFF';
 const DARK_TEXT_COLOR = Colors.light.text; // Or directly '#000000' or another dark color
 
 // Placeholder components for other screens. Replace these with your actual screen components.
-const LockedScreenPlaceholder = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: PURE_WHITE }}>
-    <Text style={{color: DARK_TEXT_COLOR}}>Locked Screen Content</Text>
-  </View>
-);
-const ScheduledScreenPlaceholder = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: PURE_WHITE }}>
-    <Text style={{color: DARK_TEXT_COLOR}}>Scheduled Screen Content</Text>
-  </View>
-);
-const ChatScreenPlaceholder = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: PURE_WHITE }}>
-    <Text style={{color: DARK_TEXT_COLOR}}>Chat Screen Content</Text>
-  </View>
-);
-const SettingsScreenPlaceholder = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: PURE_WHITE }}>
-    <Text style={{color: DARK_TEXT_COLOR}}>Settings Screen Content</Text>
-  </View>
-);
+// const LockedScreenPlaceholder = () => (
+//   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: PURE_WHITE }}>
+//     <Text style={{color: DARK_TEXT_COLOR}}>Locked Screen Content</Text>
+//   </View>
+// );
+// const ScheduledScreenPlaceholder = () => (
+//   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: PURE_WHITE }}>
+//     <Text style={{color: DARK_TEXT_COLOR}}>Scheduled Screen Content</Text>
+//   </View>
+// );
+// const ChatScreenPlaceholder = () => (
+//   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: PURE_WHITE }}>
+//     <Text style={{color: DARK_TEXT_COLOR}}>Chat Screen Content</Text>
+//   </View>
+// );
+// const SettingsScreenPlaceholder = () => (
+//   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: PURE_WHITE }}>
+//     <Text style={{color: DARK_TEXT_COLOR}}>Settings Screen Content</Text>
+//   </View>
+// );
 
 const Tab = createMaterialTopTabNavigator();
 
@@ -92,12 +96,12 @@ export default function TabLayout() {
         />
         <Tab.Screen 
           name="locked"
-          component={LockedScreenPlaceholder}
+          component={LockedScreen} // Use actual component
           options={{ tabBarLabel: 'LOCKED' }}
         />
         <Tab.Screen 
           name="scheduled"
-          component={ScheduledScreenPlaceholder}
+          component={ScheduledScreen} // Use actual component
           options={{ tabBarLabel: 'SCHEDULED' }}
         />
         <Tab.Screen 
@@ -107,8 +111,13 @@ export default function TabLayout() {
         />
         <Tab.Screen 
           name="settings"
-          component={SettingsScreenPlaceholder}
+          component={SettingsScreen} // Use actual component
           options={{ tabBarLabel: 'SETTINGS' }}
+        />
+        <Tab.Screen 
+          name="analytics"
+          component={AnalyticsScreen}
+          options={{ tabBarLabel: 'ANALYTICS' }}
         />
       </Tab.Navigator>
     </SafeAreaView>
