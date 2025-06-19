@@ -62,10 +62,11 @@ export const LockDurationModal: React.FC<LockDurationModalProps> = ({
 
     const hours = parseInt(customHours, 10) || 0;
     const minutes = parseInt(customMinutes, 10) || 0;
-    const durationMs = (hours * 60 * 60 * 1000) + (minutes * 60 * 1000);
+    // Convert to minutes, not milliseconds, as the API expects duration in minutes
+    const durationInMinutes = (hours * 60) + minutes;
 
-    if (durationMs > 0) {
-      onConfirm(app, durationMs);
+    if (durationInMinutes > 0) {
+      onConfirm(app, durationInMinutes);
     }
   };
 

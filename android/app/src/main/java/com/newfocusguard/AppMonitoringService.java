@@ -248,16 +248,10 @@ public class AppMonitoringService extends Service {
         }
         
         Log.d(TAG, "Starting monitoring service as a foreground service");
-        Intent notificationIntent = new Intent(this, MainActivity.class);
-        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
-
-        Notification notification = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setContentTitle("FocusGuard Active")
-            .setContentText("App monitoring is active to help you focus.")
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentIntent(pendingIntent)
-            .setOngoing(true)
-            .build();
+        
+        // Create a notification to keep the service in the foreground
+        Notification notification = createForegroundNotification();
+        Log.d(TAG, "Starting service in foreground mode");
 
         try {
             startForeground(NOTIFICATION_ID, notification);
@@ -274,6 +268,7 @@ public class AppMonitoringService extends Service {
                 if (!isRunning) return;
 
                 checkScheduledLocks();
+                checkExpiredLocks();
 
                 String currentApp = getCurrentForegroundApp();
                 if (currentApp != null && !currentApp.equals(lastForegroundApp)) {
@@ -584,6 +579,20 @@ public class AppMonitoringService extends Service {
             }
         }
     }
+    
+    private Notification createForegroundNotification() {
+        Intent notificationIntent = new Intent(this, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
+        
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+            .setContentTitle("FocusGuard Active")
+            .setContentText("Monitoring app usage")
+            .setSmallIcon(R.drawable.ic_launcher_background)
+            .setContentIntent(pendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_LOW);
+            
+        return builder.build();
+    }
 
     private void updateSchedules(String jsonString) {
         if (jsonString == null) {
@@ -657,6 +666,68 @@ public class AppMonitoringService extends Service {
         String schedulesJson = prefs.getString(PREFS_KEY_SCHEDULES, null);
         Log.d(TAG, "Loading schedules from SharedPreferences.");
         updateSchedules(schedulesJson);
+    }
+    
+    private void checkExpiredLocks() {
+        Log.d(TAG, "Checking for expired locks...");
+        long currentTime = System.currentTimeMillis();
+        List<String> expiredApps = new ArrayList<>();
+        
+        // Log all current locks
+        Log.d(TAG, "Current locks (" + lockedApps.size() + "):");
+        for (Map.Entry<String, Long> entry : lockedApps.entrySet()) {
+            String packageName = entry.getKey();
+            Long unlockTime = entry.getValue();
+            if (unlockTime == -1L) {
+                Log.d(TAG, "  - " + packageName + ": indefinite lock");
+            } else {
+                long remainingMs = unlockTime - currentTime;
+                Log.d(TAG, "  - " + packageName + ": unlock in " + (remainingMs / 1000) + " seconds (at " + new Date(unlockTime) + ")");
+            }
+        }
+        
+        // Find all apps with expired locks
+        for (Map.Entry<String, Long> entry : lockedApps.entrySet()) {
+            String packageName = entry.getKey();
+            Long unlockTime = entry.getValue();
+            
+            // Skip indefinite locks (-1L)
+            if (unlockTime != null && unlockTime != -1L && currentTime >= unlockTime) {
+                Log.d(TAG, "Lock expired for app: " + packageName + " (current time: " + new Date(currentTime) + ", unlock time: " + new Date(unlockTime) + ")");
+                expiredApps.add(packageName);
+            }
+        }
+        
+        // Remove expired locks
+        for (String packageName : expiredApps) {
+            Log.d(TAG, "Removing expired lock for: " + packageName);
+            lockedApps.remove(packageName);
+            
+            // Hide overlay if it's currently showing for this app
+            if (packageName.equals(currentlyOverlayingPackage)) {
+                Log.d(TAG, "Hiding overlay for unlocked app: " + packageName);
+                hideNativeOverlay();
+            }
+            
+            // Also call the native module's unlockApp method to ensure it's unlocked
+            try {
+                Intent unlockIntent = new Intent(getApplicationContext(), AppMonitoringService.class);
+                unlockIntent.setAction("UNLOCK_APP");
+                unlockIntent.putExtra("packageName", packageName);
+                startService(unlockIntent);
+                Log.d(TAG, "Sent UNLOCK_APP intent for: " + packageName);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to send unlock intent", e);
+            }
+        }
+        
+        // Save changes if any locks were removed
+        if (!expiredApps.isEmpty()) {
+            Log.d(TAG, "Removed " + expiredApps.size() + " expired locks");
+            saveLockedApps();
+        } else {
+            Log.d(TAG, "No expired locks found");
+        }
     }
 }
 

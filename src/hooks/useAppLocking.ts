@@ -42,16 +42,40 @@ export const useAppLocking = () => {
       const storedApps = await AsyncStorage.getItem('lockedApps');
       if (storedApps) {
         const apps = JSON.parse(storedApps) as LockedApp[];
-        setLockedApps(apps);
+        
+        // Check for apps with unreasonably far future unlock times (likely from the old bug)
+        const now = Date.now();
+        const oneYearFromNow = now + 365 * 24 * 60 * 60 * 1000; // One year in milliseconds
+        const fixedApps = apps.map(app => {
+          if (app.lockUntil && app.lockUntil > oneYearFromNow) {
+            console.log(`[useAppLocking] Found app with unreasonably long lock: ${app.packageName}. Fixing...`);
+            // This is likely from the old bug where milliseconds were treated as minutes
+            // Let's convert it to a reasonable duration (1 hour)
+            return {
+              ...app,
+              lockUntil: now + 60 * 60 * 1000 // 1 hour from now
+            };
+          }
+          return app;
+        });
+        
+        setLockedApps(fixedApps);
+        
         // Sync with monitoring service
-        apps.forEach(app => {
+        fixedApps.forEach(app => {
           if (app.lockUntil && app.lockUntil > Date.now()) {
             const remainingMinutes = Math.ceil((app.lockUntil - Date.now()) / 60000);
+            console.log(`[useAppLocking] Loading app ${app.packageName} with ${remainingMinutes} minutes remaining`);
             monitoringService.lockApp(app.packageName, remainingMinutes);
           } else if (!app.lockUntil) {
             monitoringService.lockApp(app.packageName);
           }
         });
+        
+        // If we fixed any apps, save the fixed versions back to storage
+        if (JSON.stringify(fixedApps) !== storedApps) {
+          saveLockedApps(fixedApps);
+        }
       }
     } catch (error) {
       console.error('Error loading locked apps:', error);
@@ -76,10 +100,17 @@ export const useAppLocking = () => {
       days: number[];
     }[]
   ) => {
+    // If duration is provided in milliseconds (from old code), convert it to minutes
+    let durationInMinutes = duration;
+    if (duration && duration > 10000) {  // If duration is very large, assume it's in milliseconds
+      durationInMinutes = Math.ceil(duration / 60000);
+      console.log(`[useAppLocking] Converting large duration ${duration}ms to ${durationInMinutes} minutes`);
+    }
+    
     const newLockedApp: LockedApp = {
       packageName,
       name,
-      lockUntil: duration ? Date.now() + duration * 60000 : undefined,
+      lockUntil: durationInMinutes ? Date.now() + durationInMinutes * 60000 : undefined,
       scheduledTimes: schedule,
     };
 
@@ -88,8 +119,8 @@ export const useAppLocking = () => {
     await saveLockedApps(updatedApps);
 
     // Start monitoring the app
-    if (duration) {
-      monitoringService.lockApp(packageName, duration);
+    if (durationInMinutes) {
+      monitoringService.lockApp(packageName, durationInMinutes);
     } else {
       monitoringService.lockApp(packageName);
     }
