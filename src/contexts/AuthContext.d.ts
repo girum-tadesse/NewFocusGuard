@@ -20,3 +20,4 @@ declare const AuthProvider: React.FC<AuthProviderProps>;
 declare function useAuth(): AuthContextType;
 
 export { AuthProvider, useAuth };
+
