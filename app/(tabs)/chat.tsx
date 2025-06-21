@@ -1,5 +1,6 @@
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { Colors } from '@/constants/Colors';
 import { sendMessageToBot } from '@/src/services/ChatbotService';
 import { MaterialIcons } from '@expo/vector-icons';
 import React, { useCallback, useState } from 'react';
@@ -65,12 +66,13 @@ export default function ChatScreen() {
       style={[
         styles.messageContainer,
         item.isUser ? styles.userMessage : styles.botMessage,
+        styles.messageShadow,
       ]}
     >
       <ThemedText
         style={[
           styles.messageText,
-          { color: item.isUser ? '#FFFFFF' : '#333333' },
+          { color: item.isUser ? Colors.light.background : Colors.light.text },
         ]}
       >
         {item.text}
@@ -90,13 +92,13 @@ export default function ChatScreen() {
       />
       {isLoading && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="small" color="#FF7757" />
+          <ActivityIndicator size="small" color={Colors.light.tint} />
           <ThemedText style={styles.loadingText}>FocusBot is thinking...</ThemedText>
         </View>
       )}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.select({ ios: 90, android: 0 })}
+        keyboardVerticalOffset={Platform.select({ ios: 0, android: 0 })}
       >
         <View style={styles.inputContainer}>
           <TextInput
@@ -104,7 +106,7 @@ export default function ChatScreen() {
             value={input}
             onChangeText={setInput}
             placeholder="Ask for study help..."
-            placeholderTextColor="#999"
+            placeholderTextColor={Colors.light.icon}
             multiline
             editable={!isLoading}
           />
@@ -113,7 +115,7 @@ export default function ChatScreen() {
             onPress={handleSend}
             disabled={isLoading}
           >
-            <MaterialIcons name="send" size={20} color="#FFFFFF" />
+            <MaterialIcons name="send" size={20} color={Colors.light.background} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -124,7 +126,7 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F7F7',
+    backgroundColor: Colors.light.background,
   },
   messageList: {
     padding: 10,
@@ -138,15 +140,22 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     maxWidth: '85%',
   },
+  messageShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
   userMessage: {
-    backgroundColor: '#FF7757',
+    backgroundColor: Colors.light.tint,
     alignSelf: 'flex-end',
   },
   botMessage: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.light.background,
     alignSelf: 'flex-start',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: Colors.light.icon,
   },
   messageText: {
     fontSize: 16,
@@ -159,36 +168,36 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontStyle: 'italic',
-    color: '#666',
+    color: Colors.light.icon,
     marginLeft: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.light.background,
   },
   textInput: {
     flex: 1,
-    backgroundColor: '#F0F0F0',
-    borderRadius: 20,
+    backgroundColor: Colors.light.background,
+    borderRadius: 25,
     paddingHorizontal: 15,
     paddingVertical: 10,
     fontSize: 16,
     marginRight: 10,
     maxHeight: 120,
+    borderColor: Colors.light.tabIconDefault,
+    borderWidth: 1,
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FF7757',
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: Colors.light.tint,
     justifyContent: 'center',
     alignItems: 'center',
   },
   disabledButton: {
-    backgroundColor: '#FFC0B0', // Lighter color when disabled
+    backgroundColor: Colors.light.tabIconDefault,
   },
 });

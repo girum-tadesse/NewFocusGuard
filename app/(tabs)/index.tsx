@@ -5,6 +5,7 @@ import { Alert, FlatList, Platform, SafeAreaView, StyleSheet, Text, TextInput, T
 // We'll use a simple grid icon for now, you might want to replace this later
 import { MaterialIcons } from '@expo/vector-icons';
 // Only import getInstalledApps, we will define the type locally
+import { Colors } from '@/constants/Colors';
 import { AppCard } from '@/src/components/AppCard';
 import { LockDurationModal } from '@/src/components/LockDurationModal'; // Import LockDurationModal
 import { ScheduleModal } from '@/src/components/ScheduleModal';
@@ -374,26 +375,28 @@ export default function AppsScreen() {
 
         {isLoadingApps && <Text style={styles.emptyListText}>Loading apps...</Text>}
         {!isLoadingApps && (
-          <FlatList
-            data={filteredApps}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <AppCard
-                app={item}
-                isLocked={isAppLocked(item.id)}
-                isSelected={selectedAppsUI.has(item.id)}
-                onSelect={toggleAppSelection}
-              />
-            )}
-            contentContainerStyle={styles.appListContent}
-            numColumns={4}
-            columnWrapperStyle={styles.row}
-            ListEmptyComponent={
-              <Text style={styles.emptyListText}>
-                {searchQuery ? 'No apps match your search.' : (Platform.OS === 'android' ? 'No apps found on device.' : 'App list not available on this platform.')}
-              </Text>
-            }
-          />
+          <View style={styles.listContainer}>
+            <FlatList
+              data={filteredApps}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <AppCard
+                  app={item}
+                  isLocked={isAppLocked(item.id)}
+                  isSelected={selectedAppsUI.has(item.id)}
+                  onSelect={toggleAppSelection}
+                />
+              )}
+              contentContainerStyle={styles.flatListContentContainer}
+              numColumns={4}
+              columnWrapperStyle={styles.row}
+              ListEmptyComponent={
+                <Text style={styles.emptyListText}>
+                  {searchQuery ? 'No apps match your search.' : (Platform.OS === 'android' ? 'No apps found on device.' : 'App list not available on this platform.')}
+                </Text>
+              }
+            />
+          </View>
         )}
       </ThemedView>
 
@@ -436,8 +439,8 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 10, 
+    paddingHorizontal: 20,
+    paddingTop: 10,
     backgroundColor: PURE_WHITE,
   },
   searchBarContainer: {
@@ -458,17 +461,16 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 13,
-    color: '#333',
+    height: 50,
+    fontSize: 14,
+    color: Colors.light.text,
     marginLeft: 8,
-    padding: 0,
-    backgroundColor: 'transparent',
+    paddingHorizontal: 15,
+    backgroundColor: Colors.light.background,
+    borderRadius: 15,
   },
   appList: {
-    flex: 1,
-  },
-  appListContent: {
-    paddingHorizontal: 8,
+    paddingBottom: 200,
   },
   row: {
     flex: 1,
@@ -494,23 +496,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   floatingButton: {
+    backgroundColor: Colors.light.tint,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF7757',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    elevation: 8,
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
   },
   floatingButtonText: {
-    color: 'white',
+    color: '#FFFFFF',
+    marginLeft: 5,
     fontSize: 12,
     fontWeight: 'bold',
-    marginLeft: 5,
+  },
+  listContainer: {
+    flex: 1,
+  },
+  flatListContentContainer: {
+    paddingBottom: 70,
+  },
+  floatingButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
   },
 });

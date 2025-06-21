@@ -11,6 +11,7 @@ import {
     View
 } from 'react-native';
 import PagerView from 'react-native-pager-view';
+import { Colors } from '../constants/Colors';
 import { useAuth } from '../src/contexts/AuthContext';
 
 const TOTAL_PAGES = 3;
@@ -138,18 +139,18 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF9F5',
+    backgroundColor: Colors.light.background,
   },
   mainContainer: {
     flex: 1,
-    backgroundColor: '#FFF9F5',
+    backgroundColor: Colors.light.background,
   },
   pagerView: {
     flex: 1,
   },
   page: {
     flex: 1,
-    backgroundColor: '#FFF9F5',
+    backgroundColor: Colors.light.background,
     paddingHorizontal: 32,
   },
   contentContainer: {
@@ -199,17 +200,17 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   activeIndicator: {
-    backgroundColor: '#FF7757',
+    backgroundColor: Colors.light.tint,
     width: 24,
   },
   mainButton: {
-    backgroundColor: '#FF7757',
+    backgroundColor: Colors.light.tint,
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FF7757',
+    shadowColor: Colors.light.tint,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

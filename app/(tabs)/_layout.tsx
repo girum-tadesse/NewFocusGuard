@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/Colors';
-import { MaterialIcons } from '@expo/vector-icons'; // For the shield icon
+import { Ionicons, MaterialIcons } from '@expo/vector-icons'; // For the shield icon and other icons
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import React from 'react';
 import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
@@ -17,7 +17,7 @@ import ScheduledScreen from './scheduled'; // Import the actual ScheduledScreen 
 import SettingsScreen from './settings'; // Import the actual SettingsScreen component (renamed from placeholder)
 
 const PURE_WHITE = '#FFFFFF';
-const DARK_TEXT_COLOR = Colors.light.text; // Or directly '#000000' or another dark color
+// const DARK_TEXT_COLOR = Colors.light.text; // No longer needed as text will be white on blue
 
 // Placeholder components for other screens. Replace these with your actual screen components.
 // const LockedScreenPlaceholder = () => (
@@ -46,21 +46,21 @@ const Tab = createMaterialTopTabNavigator();
 const CustomHeader = () => {
   // const colorScheme = useColorScheme() ?? 'light'; // No longer needed for background
   return (
-    <View style={[styles.headerContainer, { backgroundColor: PURE_WHITE }]}>
-      <MaterialIcons name="shield" size={24} color={DARK_TEXT_COLOR} style={styles.headerIcon}/>
-      <Text style={[styles.headerTitle, { color: DARK_TEXT_COLOR }]}>FOCUSGUARD</Text>
+    <View style={[styles.headerContainer, { backgroundColor: Colors.light.tint }]}> // Changed background color to tint
+      <MaterialIcons name="shield" size={24} color={PURE_WHITE} style={styles.headerIcon}/> // Changed icon color to white
+      <Text style={[styles.headerTitle, { color: PURE_WHITE }]}>Focus Guard</Text> // Changed text to "Focus Guard"
     </View>
   );
 };
 
 export default function TabLayout() {
   // const colorScheme = useColorScheme() ?? 'light'; // No longer needed for these specific colors
-  const activeTintColor = Colors.light.tint; // Use light theme tint for active elements on white bg
-  const inactiveTintColor = Colors.light.tabIconDefault; // Use light theme inactive for elements on white bg
-  const veryLightGrayBorder = '#E0E0E0';
+  const activeTintColor = PURE_WHITE; // Active text/icon color is white
+  const inactiveTintColor = '#E0E0E0'; // Inactive text/icon color is light gray
+  const veryLightGrayBorder = '#E0E0E0'; // This might still be used for other borders, keep for now.
 
   return (
-    <SafeAreaView style={[styles.fullScreen, { backgroundColor: PURE_WHITE }]}>
+    <SafeAreaView style={[styles.fullScreen, { backgroundColor: Colors.light.tint }]}> // Changed background to tint
       <CustomHeader />
       <Tab.Navigator
         initialRouteName="apps" // Set the initial tab to APPS
@@ -68,18 +68,19 @@ export default function TabLayout() {
           tabBarActiveTintColor: activeTintColor,
           tabBarInactiveTintColor: inactiveTintColor,
           tabBarLabelStyle: { 
-            fontWeight: 'bold', 
-            fontSize: 12,
+            fontWeight: 'normal', 
+            fontSize: 11,
+            textTransform: 'none', // Remove all caps
           },
           tabBarStyle: {
-            backgroundColor: PURE_WHITE,
+            backgroundColor: Colors.light.tint, // Changed background to tint
             elevation: 0, // Remove shadow on Android
             shadowOpacity: 0, // Remove shadow on iOS
             borderBottomWidth: 1, // Add a light border line below the tabs
-            borderBottomColor: veryLightGrayBorder, // Use a light gray or theme color
+            borderBottomColor: Colors.light.tint, // Make border color blend with background
           },
           tabBarIndicatorStyle: {
-            backgroundColor: activeTintColor, // Underline color for active tab
+            backgroundColor: PURE_WHITE, // Underline color for active tab is white
             height: 3, // Thickness of the underline
           },
           tabBarScrollEnabled: true,
@@ -87,37 +88,69 @@ export default function TabLayout() {
             paddingHorizontal: 10, // Reduced horizontal padding between tabs
             width: 'auto', // Let the width adjust to content
           },
+          tabBarShowIcon: true, // Ensure icons are displayed
+          // Removed tabStyle as it's not directly needed and can cause issues with tabBarItemStyle
         }}
       >
         <Tab.Screen 
           name="apps" // This name is for the navigator's internal use
           component={AppsScreen} // The component to render for this tab
-          options={{ tabBarLabel: 'APPS' }} // Text shown on the tab
+          options={{ 
+            tabBarLabel: 'Apps',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name="apps-outline" size={focused ? 22 : 20} color={color} /> // Slightly larger when focused
+            ),
+          }} // Text shown on the tab
         />
         <Tab.Screen 
           name="locked"
           component={LockedScreen} // Use actual component
-          options={{ tabBarLabel: 'LOCKED' }}
+          options={{
+            tabBarLabel: 'Locked',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name="lock-closed-outline" size={focused ? 22 : 20} color={color} /> // Slightly larger when focused
+            ),
+          }}
         />
         <Tab.Screen 
           name="scheduled"
           component={ScheduledScreen} // Use actual component
-          options={{ tabBarLabel: 'SCHEDULED' }}
+          options={{
+            tabBarLabel: 'Scheduled',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name="alarm-outline" size={focused ? 22 : 20} color={color} /> // Slightly larger when focused
+            ),
+          }}
         />
         <Tab.Screen 
           name="chat"
           component={ChatScreen}
-          options={{ tabBarLabel: 'CHAT' }}
+          options={{
+            tabBarLabel: 'Chat',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name="chatbubbles-outline" size={focused ? 22 : 20} color={color} /> // Slightly larger when focused
+            ),
+          }}
         />
         <Tab.Screen 
           name="settings"
           component={SettingsScreen} // Use actual component
-          options={{ tabBarLabel: 'SETTINGS' }}
+          options={{
+            tabBarLabel: 'Settings',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name="settings-outline" size={focused ? 22 : 20} color={color} /> // Slightly larger when focused
+            ),
+          }}
         />
         <Tab.Screen 
           name="analytics"
           component={AnalyticsScreen}
-          options={{ tabBarLabel: 'ANALYTICS' }}
+          options={{
+            tabBarLabel: 'Analytics',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name="bar-chart-outline" size={focused ? 22 : 20} color={color} /> // Slightly larger when focused
+            ),
+          }}
         />
       </Tab.Navigator>
     </SafeAreaView>
@@ -133,7 +166,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12, 
-    marginBottom: 20,
+    marginBottom: 30,
     // backgroundColor is set dynamically by theme
   },
   headerIcon: {
@@ -142,6 +175,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: 'bold',
+    marginTop: 2, // Added to slightly lower the text
     // color is set dynamically by theme
   },
 });
