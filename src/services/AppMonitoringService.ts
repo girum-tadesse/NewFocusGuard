@@ -6,6 +6,7 @@ interface AppMonitoringServiceInterface {
   isMonitoring(): Promise<boolean>;
   lockApp(packageName: string, duration?: number): Promise<void>;
   unlockApp(packageName: string): Promise<void>;
+  getLockedApps(): Map<string, number | undefined>;
   cleanup(): void;
 }
 
@@ -158,6 +159,13 @@ class AppMonitoringService {
       console.error('Failed to unlock app:', error);
       throw error;
     }
+  }
+
+  // Get the current locked apps map
+  public getLockedApps(): Map<string, number | undefined> {
+    console.log('[AppMonitoringService] getLockedApps called');
+    // Return a copy of the map to prevent direct modification
+    return new Map(this.lockedApps);
   }
 
   public cleanup(): void {
