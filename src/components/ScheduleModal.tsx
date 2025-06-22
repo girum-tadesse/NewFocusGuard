@@ -1,3 +1,4 @@
+import { Colors } from '@/src/constants/Colors';
 import { ScheduleConfig } from '@/src/types/LockManagerTypes';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useState } from 'react';
@@ -236,7 +237,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
   },
   confirmButton: {
-    backgroundColor: '#FF7757',
+    backgroundColor: Colors.light.tint,
   },
   buttonText: {
     textAlign: 'center',

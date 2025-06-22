@@ -1,4 +1,4 @@
-import { ThemedText } from '@/components/ThemedText';
+import { Colors } from '@/src/constants/Colors';
 import React, { useEffect, useState } from 'react';
 import {
     KeyboardAvoidingView,
@@ -6,6 +6,7 @@ import {
     Platform,
     ScrollView,
     StyleSheet,
+    Text,
     TextInput,
     TouchableOpacity,
     View
@@ -26,7 +27,7 @@ interface LockDurationModalProps {
 }
 
 const PURE_WHITE = '#FFFFFF';
-const PRIMARY_COLOR = '#FF7757';
+const PRIMARY_COLOR = Colors.light.tint;
 const LIGHT_GRAY_BORDER = '#E0E0E0';
 const TEXT_COLOR_DARK = '#333333';
 const TEXT_COLOR_LIGHT = '#666666';
@@ -85,13 +86,13 @@ export const LockDurationModal: React.FC<LockDurationModalProps> = ({
       >
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           <View style={styles.modalContent}>
-            <ThemedText style={styles.title}>
+            <Text style={styles.title}>
               Lock {selectedAppsCount} app{selectedAppsCount !== 1 ? 's' : ''}
-            </ThemedText>
+            </Text>
 
-            <ThemedText style={styles.subtitle}>
+            <Text style={styles.subtitle}>
               Enter Lock Duration
-            </ThemedText>
+            </Text>
 
             <View style={styles.customInputContainer}>
               <View style={styles.inputGroup}>
@@ -104,10 +105,10 @@ export const LockDurationModal: React.FC<LockDurationModalProps> = ({
                   onChangeText={text => setCustomHours(formatNumberInput(text))}
                   maxLength={2}
                 />
-                <ThemedText style={styles.inputLabel}>Hours</ThemedText>
+                <Text style={styles.inputLabel}>Hours</Text>
               </View>
 
-              <ThemedText style={styles.customInputSeparator}>:</ThemedText>
+              <Text style={styles.customInputSeparator}>:</Text>
 
               <View style={styles.inputGroup}>
                 <TextInput
@@ -119,7 +120,7 @@ export const LockDurationModal: React.FC<LockDurationModalProps> = ({
                   onChangeText={text => setCustomMinutes(formatNumberInput(text))}
                   maxLength={2}
                 />
-                <ThemedText style={styles.inputLabel}>Minutes</ThemedText>
+                <Text style={styles.inputLabel}>Minutes</Text>
               </View>
             </View>
 
@@ -128,16 +129,23 @@ export const LockDurationModal: React.FC<LockDurationModalProps> = ({
                 style={[styles.actionButton, styles.cancelButton]}
                 onPress={onClose}
               >
-                <ThemedText style={[styles.actionButtonText, styles.cancelButtonText]}>Cancel</ThemedText>
+                <Text style={{
+                  textAlign: 'center',
+                  fontSize: 16,
+                }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.actionButton, styles.confirmButton, !isValid && styles.disabledButton]}
+                style={[styles.actionButton, styles.confirmButton]}
                 onPress={handleConfirm}
                 disabled={!isValid}
               >
-                <ThemedText style={[styles.actionButtonText, styles.confirmButtonText, !isValid && styles.disabledButtonText]}>
+                <Text style={{
+                  textAlign: 'center',
+                  fontSize: 16,
+                  color: '#fff',
+                }}>
                   Confirm Lock
-                </ThemedText>
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -226,37 +234,25 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
+    padding: 12,
+    borderRadius: 8,
+    marginHorizontal: 8,
   },
   cancelButton: {
-    backgroundColor: PURE_WHITE,
-    borderColor: LIGHT_GRAY_BORDER,
-    marginRight: 8,
+    backgroundColor: '#f0f0f0',
   },
   confirmButton: {
     backgroundColor: PRIMARY_COLOR,
-    borderColor: PRIMARY_COLOR,
-    marginLeft: 8,
   },
   actionButtonText: {
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
   cancelButtonText: {
     color: TEXT_COLOR_LIGHT,
   },
   confirmButtonText: {
-    color: PURE_WHITE,
-  },
-  disabledButton: {
-    backgroundColor: '#E0E0E0',
-    borderColor: '#D0D0D0',
-  },
-  disabledButtonText: {
-    color: '#A0A0A0',
+    color: '#fff',
   },
 }); 

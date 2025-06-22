@@ -133,22 +133,22 @@ export default function TabLayout() {
           }}
         />
         <Tab.Screen 
-          name="settings"
-          component={SettingsScreen} // Use actual component
-          options={{
-            tabBarLabel: 'Settings',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons name="settings-outline" size={focused ? 22 : 20} color={color} /> // Slightly larger when focused
-            ),
-          }}
-        />
-        <Tab.Screen 
           name="analytics"
           component={AnalyticsScreen}
           options={{
             tabBarLabel: 'Analytics',
             tabBarIcon: ({ color, focused }) => (
               <Ionicons name="bar-chart-outline" size={focused ? 22 : 20} color={color} /> // Slightly larger when focused
+            ),
+          }}
+        />
+        <Tab.Screen 
+          name="settings"
+          component={SettingsScreen} // Use actual component
+          options={{
+            tabBarLabel: 'Settings',
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons name="settings-outline" size={focused ? 22 : 20} color={color} /> // Slightly larger when focused
             ),
           }}
         />
