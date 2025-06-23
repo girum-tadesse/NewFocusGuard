@@ -23,6 +23,7 @@ export default function SettingsScreen() {
   // Motivation settings state
   const [showProductivityStats, setShowProductivityStats] = useState(true);
   const [quoteCategory, setQuoteCategory] = useState('Motivation');
+  const [quoteSource, setQuoteSource] = useState<'default' | 'custom' | 'both'>('both');
   const [isAddQuoteModalVisible, setIsAddQuoteModalVisible] = useState(false);
   
   // Load motivation settings on component mount
@@ -34,6 +35,7 @@ export default function SettingsScreen() {
         
         setQuoteCategory(settings.quoteCategory);
         setShowProductivityStats(settings.showProductivityStats);
+        setQuoteSource(settings.quoteSource);
       } catch (error) {
         console.error('Error loading motivation settings:', error);
       }
@@ -152,31 +154,43 @@ export default function SettingsScreen() {
     }
   };
   
-  const handleManageCustomQuotes = async () => {
-    try {
-      const motivationService = MotivationService.getInstance();
-      const customQuotes = await motivationService.getCustomQuotes();
-      
-      if (customQuotes.length === 0) {
-        Alert.alert("No Custom Quotes", "You haven't added any custom quotes yet.");
-        return;
-      }
-      
-      // For now, just show a list of quotes with option to delete
-      // In a real app, you might want to navigate to a dedicated screen for this
+  const handleSelectQuoteSource = () => {
       Alert.alert(
-        "Your Custom Quotes",
-        `You have ${customQuotes.length} custom quote(s). You can manage them in the upcoming version.`,
-        [
-          {
-            text: "OK",
-            style: "cancel"
+      "Select Quote Source",
+      "Choose where to display quotes from",
+      [
+        {
+          text: "Default Quotes Only",
+          onPress: async () => {
+            setQuoteSource("default");
+            await MotivationService.getInstance().setQuoteSource("default");
           }
-        ]
-      );
-    } catch (error) {
-      Alert.alert("Error", "Failed to load custom quotes. Please try again.");
-    }
+        },
+        {
+          text: "Custom Quotes Only",
+          onPress: async () => {
+            setQuoteSource("custom");
+            await MotivationService.getInstance().setQuoteSource("custom");
+          }
+        },
+        {
+          text: "Both Default & Custom",
+          onPress: async () => {
+            setQuoteSource("both");
+            await MotivationService.getInstance().setQuoteSource("both");
+          }
+        },
+        {
+          text: "Cancel",
+          style: "cancel"
+        }
+      ]
+    );
+  };
+  
+  const handleManageCustomQuotes = () => {
+    // Navigate to the ManageQuotesScreen
+    router.push('/manageQuotes');
   };
 
   return (
@@ -216,15 +230,6 @@ export default function SettingsScreen() {
         <View style={styles.optionsContainer}>
           <TouchableOpacity 
             style={styles.optionItem}
-            onPress={() => Alert.alert("Coming Soon", "Edit profile functionality will be available soon.")}
-          >
-            <Ionicons name="person-outline" size={24} color={Colors.light.tint} />
-            <Text style={styles.optionText}>Edit Profile</Text>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.optionItem}
             onPress={() => Alert.alert("Coming Soon", "Change password functionality will be available soon.")}
           >
             <Ionicons name="key-outline" size={24} color={Colors.light.tint} />
@@ -254,6 +259,19 @@ export default function SettingsScreen() {
             <Ionicons name="chatbubble-outline" size={24} color={Colors.light.tint} />
             <Text style={styles.optionText}>Quote Category</Text>
             <Text style={styles.optionValue}>{quoteCategory}</Text>
+            <Ionicons name="chevron-forward" size={20} color="#999" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.optionItem}
+            onPress={handleSelectQuoteSource}
+          >
+            <Ionicons name="filter-outline" size={24} color={Colors.light.tint} />
+            <Text style={styles.optionText}>Quote Source</Text>
+            <Text style={styles.optionValue}>
+              {quoteSource === 'default' ? 'Default Only' : 
+               quoteSource === 'custom' ? 'Custom Only' : 'Both'}
+            </Text>
             <Ionicons name="chevron-forward" size={20} color="#999" />
           </TouchableOpacity>
 
@@ -291,22 +309,153 @@ export default function SettingsScreen() {
       {/* App Preferences Section */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>App Preferences</Text>
-        <Text style={styles.placeholderText}>Coming soon</Text>
+        
+        <View style={styles.optionsContainer}>
+          <View style={styles.optionItem}>
+            <Ionicons name="notifications-outline" size={24} color={Colors.light.tint} />
+            <Text style={styles.optionText}>Push Notifications</Text>
+            <Switch
+              trackColor={{ false: "#E0E0E0", true: `${Colors.light.tint}80` }}
+              thumbColor={true ? Colors.light.tint : "#F4F4F4"}
+              value={true}
+              onValueChange={() => Alert.alert("Coming Soon", "Notification settings will be available in a future update.")}
+            />
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.optionItem}
+            onPress={() => Alert.alert("Coming Soon", "Theme settings will be available in a future update.")}
+          >
+            <Ionicons name="color-palette-outline" size={24} color={Colors.light.tint} />
+            <Text style={styles.optionText}>Theme</Text>
+            <Text style={styles.optionValue}>Light</Text>
+            <Ionicons name="chevron-forward" size={20} color="#999" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.optionItem}
+            onPress={() => Alert.alert("Data Usage", "FocusGuard stores app usage data locally on your device to provide you with insights about your app habits. This data is not shared with third parties.")}
+          >
+            <Ionicons name="analytics-outline" size={24} color={Colors.light.tint} />
+            <Text style={styles.optionText}>Data Usage</Text>
+            <Ionicons name="chevron-forward" size={20} color="#999" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Lock Settings</Text>
-        <Text style={styles.placeholderText}>Coming soon</Text>
+        
+        <View style={styles.optionsContainer}>
+          <View style={styles.optionItem}>
+            <Ionicons name="shield-checkmark-outline" size={24} color={Colors.light.tint} />
+            <Text style={styles.optionText}>Strict Mode</Text>
+            <Switch
+              trackColor={{ false: "#E0E0E0", true: `${Colors.light.tint}80` }}
+              thumbColor={false ? Colors.light.tint : "#F4F4F4"}
+              value={false}
+              onValueChange={() => Alert.alert("Strict Mode", "When enabled, FocusGuard will prevent you from disabling app locks before they expire. This helps maintain your focus and discipline.\n\nThis feature will be available in a future update.")}
+            />
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.optionItem}
+            onPress={() => Alert.alert("Default Lock Duration", "Choose a default lock duration for quick locks. This will be used when you don't specify a custom duration.\n\nThis feature will be available in a future update.")}
+          >
+            <Ionicons name="time-outline" size={24} color={Colors.light.tint} />
+            <Text style={styles.optionText}>Default Lock Duration</Text>
+            <Text style={styles.optionValue}>30 min</Text>
+            <Ionicons name="chevron-forward" size={20} color="#999" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.optionItem}
+            onPress={() => Alert.alert("Screen Lock Overlay", "Choose the type of overlay to show when an app is locked. Options include full block, motivational quotes, or productivity stats.\n\nThis feature will be available in a future update.")}
+          >
+            <Ionicons name="layers-outline" size={24} color={Colors.light.tint} />
+            <Text style={styles.optionText}>Lock Screen Style</Text>
+            <Text style={styles.optionValue}>Default</Text>
+            <Ionicons name="chevron-forward" size={20} color="#999" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Support & Feedback</Text>
-        <Text style={styles.placeholderText}>Coming soon</Text>
+        
+        <View style={styles.optionsContainer}>
+          <TouchableOpacity 
+            style={styles.optionItem}
+            onPress={() => Alert.alert("Help Center", "Access our help center for tutorials, guides, and answers to frequently asked questions.\n\nThis feature will be available in a future update.")}
+          >
+            <Ionicons name="help-circle-outline" size={24} color={Colors.light.tint} />
+            <Text style={styles.optionText}>Help Center</Text>
+            <Ionicons name="chevron-forward" size={20} color="#999" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.optionItem}
+            onPress={() => Alert.alert("Send Feedback", "We value your input! Share your thoughts, suggestions, or report issues to help us improve FocusGuard.\n\nThis feature will be available in a future update.")}
+          >
+            <Ionicons name="chatbox-outline" size={24} color={Colors.light.tint} />
+            <Text style={styles.optionText}>Send Feedback</Text>
+            <Ionicons name="chevron-forward" size={20} color="#999" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.optionItem}
+            onPress={() => Alert.alert("Rate the App", "Enjoying FocusGuard? Please consider rating it on the app store to help others discover it.\n\nThis feature will be available in a future update.")}
+          >
+            <Ionicons name="star-outline" size={24} color={Colors.light.tint} />
+            <Text style={styles.optionText}>Rate the App</Text>
+            <Ionicons name="chevron-forward" size={20} color="#999" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>About</Text>
-        <Text style={styles.versionText}>FocusGuard v1.0.0</Text>
+        
+        <View style={styles.aboutContainer}>
+          <View style={styles.appIconContainer}>
+            <Image 
+              source={require('../../assets/images/icon.png')} 
+              style={styles.appIcon} 
+            />
+          </View>
+          
+          <Text style={styles.appName}>FocusGuard</Text>
+          <Text style={styles.versionText}>Version 1.0.0</Text>
+          
+          <View style={styles.optionsContainer}>
+            <TouchableOpacity 
+              style={styles.optionItem}
+              onPress={() => Alert.alert("Privacy Policy", "FocusGuard respects your privacy. We do not collect or share your personal data with third parties. All app usage data is stored locally on your device.\n\nA complete privacy policy will be available in a future update.")}
+            >
+              <Ionicons name="lock-closed-outline" size={24} color={Colors.light.tint} />
+              <Text style={styles.optionText}>Privacy Policy</Text>
+              <Ionicons name="chevron-forward" size={20} color="#999" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.optionItem}
+              onPress={() => Alert.alert("Terms of Service", "By using FocusGuard, you agree to our terms of service. These terms outline your rights and responsibilities as a user.\n\nComplete terms of service will be available in a future update.")}
+            >
+              <Ionicons name="document-text-outline" size={24} color={Colors.light.tint} />
+              <Text style={styles.optionText}>Terms of Service</Text>
+              <Ionicons name="chevron-forward" size={20} color="#999" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.optionItem}
+              onPress={() => Alert.alert("Acknowledgements", "FocusGuard is built with love using React Native, Expo, and other open source technologies.\n\nA complete list of acknowledgements will be available in a future update.")}
+            >
+              <Ionicons name="heart-outline" size={24} color={Colors.light.tint} />
+              <Text style={styles.optionText}>Acknowledgements</Text>
+              <Ionicons name="chevron-forward" size={20} color="#999" />
+            </TouchableOpacity>
+          </View>
+        </View>
     </View>
       
       {/* Add Quote Modal */}
@@ -435,5 +584,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
+    marginBottom: 10,
+  },
+  aboutContainer: {
+    alignItems: 'center',
+  },
+  appIconContainer: {
+    marginVertical: 15,
+  },
+  appIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+  },
+  appName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
   },
 }); 

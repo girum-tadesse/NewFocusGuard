@@ -46,9 +46,9 @@ const Tab = createMaterialTopTabNavigator();
 const CustomHeader = () => {
   // const colorScheme = useColorScheme() ?? 'light'; // No longer needed for background
   return (
-    <View style={[styles.headerContainer, { backgroundColor: Colors.light.tint }]}> // Changed background color to tint
-      <MaterialIcons name="shield" size={24} color={PURE_WHITE} style={styles.headerIcon}/> // Changed icon color to white
-      <Text style={[styles.headerTitle, { color: PURE_WHITE }]}>Focus Guard</Text> // Changed text to "Focus Guard"
+    <View style={[styles.headerContainer, { backgroundColor: Colors.light.tint }]}>
+      <MaterialIcons name="shield" size={24} color={PURE_WHITE} style={styles.headerIcon}/>
+      <Text style={[styles.headerTitle, { color: PURE_WHITE }]}>Focus Guard</Text>
     </View>
   );
 };
@@ -60,7 +60,7 @@ export default function TabLayout() {
   const veryLightGrayBorder = '#E0E0E0'; // This might still be used for other borders, keep for now.
 
   return (
-    <SafeAreaView style={[styles.fullScreen, { backgroundColor: Colors.light.tint }]}> // Changed background to tint
+    <SafeAreaView style={[styles.fullScreen, { backgroundColor: Colors.light.tint }]}>
       <CustomHeader />
       <Tab.Navigator
         initialRouteName="apps" // Set the initial tab to APPS
@@ -98,7 +98,7 @@ export default function TabLayout() {
           options={{ 
             tabBarLabel: 'Apps',
             tabBarIcon: ({ color, focused }) => (
-              <Ionicons name="apps-outline" size={focused ? 22 : 20} color={color} /> // Slightly larger when focused
+              <Ionicons name="apps-outline" size={focused ? 22 : 20} color={color} />
             ),
           }} // Text shown on the tab
         />
@@ -108,7 +108,7 @@ export default function TabLayout() {
           options={{
             tabBarLabel: 'Locked',
             tabBarIcon: ({ color, focused }) => (
-              <Ionicons name="lock-closed-outline" size={focused ? 22 : 20} color={color} /> // Slightly larger when focused
+              <Ionicons name="lock-closed-outline" size={focused ? 22 : 20} color={color} />
             ),
           }}
         />
@@ -118,7 +118,7 @@ export default function TabLayout() {
           options={{
             tabBarLabel: 'Scheduled',
             tabBarIcon: ({ color, focused }) => (
-              <Ionicons name="alarm-outline" size={focused ? 22 : 20} color={color} /> // Slightly larger when focused
+              <Ionicons name="alarm-outline" size={focused ? 22 : 20} color={color} />
             ),
           }}
         />
@@ -128,7 +128,7 @@ export default function TabLayout() {
           options={{
             tabBarLabel: 'Chat',
             tabBarIcon: ({ color, focused }) => (
-              <Ionicons name="chatbubbles-outline" size={focused ? 22 : 20} color={color} /> // Slightly larger when focused
+              <Ionicons name="chatbubbles-outline" size={focused ? 22 : 20} color={color} />
             ),
           }}
         />
@@ -138,7 +138,7 @@ export default function TabLayout() {
           options={{
             tabBarLabel: 'Analytics',
             tabBarIcon: ({ color, focused }) => (
-              <Ionicons name="bar-chart-outline" size={focused ? 22 : 20} color={color} /> // Slightly larger when focused
+              <Ionicons name="bar-chart-outline" size={focused ? 22 : 20} color={color} />
             ),
           }}
         />
@@ -148,7 +148,7 @@ export default function TabLayout() {
           options={{
             tabBarLabel: 'Settings',
             tabBarIcon: ({ color, focused }) => (
-              <Ionicons name="settings-outline" size={focused ? 22 : 20} color={color} /> // Slightly larger when focused
+              <Ionicons name="settings-outline" size={focused ? 22 : 20} color={color} />
             ),
           }}
         />

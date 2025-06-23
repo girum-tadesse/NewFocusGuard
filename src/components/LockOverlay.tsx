@@ -31,9 +31,12 @@ export const LockOverlay: React.FC<LockOverlayProps> = ({
         const showStats = await motivationService.getShowProductivityStats();
         setShowProductivityStats(showStats);
         
-        // Get a random quote based on the user's preferred category
+        // Get a random quote based on the user's preferred category and source
         const randomQuote = await motivationService.getRandomQuote();
         setCurrentQuote(randomQuote);
+        
+        // Log the type of quote displayed
+        console.log(`Displaying a ${randomQuote.isCustom ? 'custom' : 'default'} quote in the category ${randomQuote.category}`);
       } catch (error) {
         console.error('Error loading quote and settings:', error);
         // If there's an error, use the provided quote or a default one
@@ -75,7 +78,12 @@ export const LockOverlay: React.FC<LockOverlayProps> = ({
             {currentQuote.author && (
               <Text style={styles.quoteAuthor}>- {currentQuote.author}</Text>
             )}
-            <Text style={styles.quoteCategory}>{currentQuote.category}</Text>
+            <View style={styles.quoteFooter}>
+              <Text style={styles.quoteCategory}>{currentQuote.category}</Text>
+              <Text style={[styles.quoteType, currentQuote.isCustom ? styles.customQuote : styles.defaultQuote]}>
+                {currentQuote.isCustom ? 'Custom' : 'Default'}
+              </Text>
+            </View>
           </View>
         )}
         
@@ -183,8 +191,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#fff',
     textAlign: 'left',
-    marginTop: 15,
     opacity: 0.7,
+  },
+  quoteFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 15,
+  },
+  quoteType: {
+    fontSize: 12,
+    padding: 4,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  customQuote: {
+    backgroundColor: 'rgba(46, 204, 113, 0.7)',
+    color: '#fff',
+  },
+  defaultQuote: {
+    backgroundColor: 'rgba(52, 152, 219, 0.7)',
+    color: '#fff',
   },
   timeContainer: {
     flexDirection: 'row',

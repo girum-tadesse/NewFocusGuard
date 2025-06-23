@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const QUOTE_CATEGORY_KEY = 'quoteCategory';
 const SHOW_PRODUCTIVITY_STATS_KEY = 'showProductivityStats';
 const CUSTOM_QUOTES_KEY = 'customQuotes';
+const QUOTE_SOURCE_KEY = 'quoteSource'; // 'default', 'custom', or 'both'
 
 // Default quotes by category
 const DEFAULT_QUOTES = {
@@ -45,10 +46,13 @@ export interface Quote {
   author?: string;
 }
 
+export type QuoteSource = 'default' | 'custom' | 'both';
+
 export interface MotivationSettings {
   quoteCategory: string;
   showProductivityStats: boolean;
   customQuotes: Quote[];
+  quoteSource: QuoteSource;
 }
 
 class MotivationService {
@@ -63,30 +67,55 @@ class MotivationService {
     return MotivationService.instance;
   }
   
-  // Get a random quote based on the selected category
+  // Get a random quote based on the selected category and source preference
   public async getRandomQuote(): Promise<Quote> {
     try {
-      // Get the user's preferred category
+      // Get the user's preferred category and source
       const category = await this.getQuoteCategory();
+      const quoteSource = await this.getQuoteSource();
       
-      // Get custom quotes
-      const customQuotes = await this.getCustomQuotes();
-      const categoryCustomQuotes = customQuotes.filter(q => q.category === category);
+      // Get quotes based on source preference
+      let availableQuotes: Quote[] = [];
       
-      // Combine default and custom quotes for the category
-      const allQuotes = [
-        ...DEFAULT_QUOTES[category as keyof typeof DEFAULT_QUOTES].map((text, index) => ({
+      // Get default quotes if needed
+      if (quoteSource === 'default' || quoteSource === 'both') {
+        availableQuotes = [
+          ...availableQuotes,
+          ...DEFAULT_QUOTES[category as keyof typeof DEFAULT_QUOTES].map((text, index) => ({
+            id: `default-${category}-${index}`,
+            text,
+            category,
+            isCustom: false
+          }))
+        ];
+      }
+      
+      // Get custom quotes if needed
+      if (quoteSource === 'custom' || quoteSource === 'both') {
+        const customQuotes = await this.getCustomQuotes();
+        const categoryCustomQuotes = customQuotes.filter(q => q.category === category);
+        
+        if (categoryCustomQuotes.length > 0) {
+          availableQuotes = [...availableQuotes, ...categoryCustomQuotes];
+        }
+      }
+      
+      // If no quotes are available (e.g., no custom quotes when source is 'custom'),
+      // fall back to default quotes
+      if (availableQuotes.length === 0) {
+        availableQuotes = DEFAULT_QUOTES[category as keyof typeof DEFAULT_QUOTES].map((text, index) => ({
           id: `default-${category}-${index}`,
           text,
           category,
           isCustom: false
-        })),
-        ...categoryCustomQuotes
-      ];
+        }));
+        
+        console.log('No quotes available for selected source. Falling back to defaults.');
+      }
       
       // Return a random quote
-      const randomIndex = Math.floor(Math.random() * allQuotes.length);
-      return allQuotes[randomIndex];
+      const randomIndex = Math.floor(Math.random() * availableQuotes.length);
+      return availableQuotes[randomIndex];
     } catch (error) {
       console.error('Error getting random quote:', error);
       // Return a default quote if there's an error
@@ -182,18 +211,40 @@ class MotivationService {
     }
   }
   
+  // Get the user's preferred quote source
+  public async getQuoteSource(): Promise<QuoteSource> {
+    try {
+      const source = await AsyncStorage.getItem(QUOTE_SOURCE_KEY);
+      return (source as QuoteSource) || 'both'; // Default to 'both' if not set
+    } catch (error) {
+      console.error('Error getting quote source preference:', error);
+      return 'both';
+    }
+  }
+  
+  // Set the user's preferred quote source
+  public async setQuoteSource(source: QuoteSource): Promise<void> {
+    try {
+      await AsyncStorage.setItem(QUOTE_SOURCE_KEY, source);
+    } catch (error) {
+      console.error('Error setting quote source preference:', error);
+    }
+  }
+  
   // Get all settings
   public async getSettings(): Promise<MotivationSettings> {
-    const [quoteCategory, showProductivityStats, customQuotes] = await Promise.all([
+    const [quoteCategory, showProductivityStats, customQuotes, quoteSource] = await Promise.all([
       this.getQuoteCategory(),
       this.getShowProductivityStats(),
-      this.getCustomQuotes()
+      this.getCustomQuotes(),
+      this.getQuoteSource()
     ]);
     
     return {
       quoteCategory,
       showProductivityStats,
-      customQuotes
+      customQuotes,
+      quoteSource
     };
   }
 }
