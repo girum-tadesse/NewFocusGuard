@@ -36,17 +36,35 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     const finalEndDate = new Date(endDate);
     finalEndDate.setHours(endHours, endMinutes, 0, 0);
 
-    // If no days are selected, select all days
-    const effectiveSelectedDays = selectedDays.some(day => day) 
-      ? selectedDays 
-      : [true, true, true, true, true, true, true];
+    // Set up startTime and endTime as separate Date objects for time comparisons
+    // These will be used to compare just the time portion
+    const finalStartTime = new Date();
+    finalStartTime.setHours(startHours, startMinutes, 0, 0);
+    
+    const finalEndTime = new Date(); 
+    finalEndTime.setHours(endHours, endMinutes, 0, 0);
 
+    // If it's the same day and end time is earlier than start time, assume it's next day
+    if (finalEndTime < finalStartTime) {
+      finalEndTime.setDate(finalEndTime.getDate() + 1);
+    }
+
+    console.log('Schedule config created:', {
+      startDate: finalStartDate.toISOString(),
+      endDate: finalEndDate.toISOString(),
+      startTime: finalStartTime.toISOString(),
+      endTime: finalEndTime.toISOString(),
+      selectedDays: selectedDays
+    });
+
+    // Keep selectedDays as is - don't automatically set all days to true
+    // This allows for one-time schedules when no days are selected
     onConfirm({
       startDate: finalStartDate,
       endDate: finalEndDate,
-      startTime: finalStartDate,
-      endTime: finalEndDate,
-      selectedDays: effectiveSelectedDays,
+      startTime: finalStartTime,
+      endTime: finalEndTime,
+      selectedDays: selectedDays,
     });
   };
   

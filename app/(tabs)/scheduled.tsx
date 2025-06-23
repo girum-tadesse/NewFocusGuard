@@ -5,7 +5,7 @@ import { scheduleManager } from '@/src/services/ScheduleManager';
 import { ScheduledLock } from '@/src/types/LockManagerTypes';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, Image, StyleSheet, Switch, Text, View } from 'react-native';
+import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
 
 interface EnhancedScheduledLock extends ScheduledLock {
   apps: {
@@ -47,56 +47,69 @@ export default function ScheduledScreen() {
     return `${formattedHours}:${formattedMinutes} ${ampm}`;
   };
 
-  // Format days from boolean array
-  const formatDays = (days: boolean[]): string => {
-    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const selectedDays = days.map((selected, index) => selected ? dayNames[index] : null).filter(Boolean);
-    
-    if (selectedDays.length === 0) {
-      return 'One-time';
-    } else if (selectedDays.length === 7) {
-      return 'Every day';
-    } else if (selectedDays.length === 5 && 
-               days[0] && days[1] && days[2] && days[3] && days[4]) {
-      return 'Weekdays';
-    } else if (selectedDays.length === 2 && days[5] && days[6]) {
-      return 'Weekends';
-    } else {
-      return selectedDays.join(', ');
-    }
-  };
+  // Format time from Date objects for display
 
   // Check if schedule is currently active
   const isScheduleActive = (schedule: ScheduledLock): boolean => {
-    if (!schedule.isEnabled) return false;
+    if (!schedule.isEnabled) {
+      console.log(`Schedule ${schedule.id} is disabled`);
+      return false;
+    }
 
     const now = new Date();
     const currentDay = (now.getDay() + 6) % 7; // Convert to 0=Monday, 6=Sunday
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
+    const currentTime = now.getHours() * 60 + now.getMinutes(); // Current time in minutes
     
-    // Check if today is a scheduled day
-    if (!schedule.scheduleConfig.selectedDays[currentDay]) {
-      return false;
-    }
-    
-    // Parse start and end times
+    // Get start and end times
     const startTime = new Date(schedule.scheduleConfig.startTime);
     const endTime = new Date(schedule.scheduleConfig.endTime);
     
-    const startHour = startTime.getHours();
-    const startMinute = startTime.getMinutes();
-    const endHour = endTime.getHours();
-    const endMinute = endTime.getMinutes();
+    const startTimeMinutes = startTime.getHours() * 60 + startTime.getMinutes();
+    const endTimeMinutes = endTime.getHours() * 60 + endTime.getMinutes();
     
-    // Check if current time is within schedule
-    if (currentHour > startHour || (currentHour === startHour && currentMinute >= startMinute)) {
-      if (currentHour < endHour || (currentHour === endHour && currentMinute < endMinute)) {
-        return true;
+    console.log(`Schedule ${schedule.id} - Current time: ${now.getHours()}:${now.getMinutes()} (${currentTime} mins)`);
+    console.log(`Schedule ${schedule.id} - Start time: ${startTime.getHours()}:${startTime.getMinutes()} (${startTimeMinutes} mins)`);
+    console.log(`Schedule ${schedule.id} - End time: ${endTime.getHours()}:${endTime.getMinutes()} (${endTimeMinutes} mins)`);
+    
+    // For one-time schedules (no days selected)
+    const hasSelectedDays = schedule.scheduleConfig.selectedDays.some(day => day === true);
+    if (!hasSelectedDays) {
+      // Get the current date (without time)
+      const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      // If start date is specified, check if today is the correct date
+      if (schedule.scheduleConfig.startDate) {
+        const scheduleStartDate = new Date(schedule.scheduleConfig.startDate);
+        const scheduleStartDay = new Date(
+          scheduleStartDate.getFullYear(), 
+          scheduleStartDate.getMonth(), 
+          scheduleStartDate.getDate()
+        );
+        
+        // If schedule date is not today, it's not active
+        if (scheduleStartDay.getTime() !== todayDate.getTime()) {
+          console.log(`Schedule ${schedule.id} - One-time schedule for a different date:`, 
+            scheduleStartDay.toDateString(), 'vs today:', todayDate.toDateString());
+          return false;
+        }
       }
+      
+      // If it's a one-time schedule, check if current time is within schedule
+      const isActive = currentTime >= startTimeMinutes && currentTime < endTimeMinutes;
+      console.log(`Schedule ${schedule.id} - One-time schedule, active: ${isActive}`);
+      return isActive;
     }
     
-    return false;
+    // For recurring schedules, check if today is scheduled and time is within range
+    if (!schedule.scheduleConfig.selectedDays[currentDay]) {
+      console.log(`Schedule ${schedule.id} - Today (${currentDay}) is not scheduled`);
+      return false; // Today is not a scheduled day
+    }
+    
+    // Check if current time is within schedule
+    const isActive = currentTime >= startTimeMinutes && currentTime < endTimeMinutes;
+    console.log(`Schedule ${schedule.id} - Recurring schedule, active: ${isActive}`);
+    return isActive;
   };
 
   // Function to fetch schedules
@@ -105,8 +118,92 @@ export default function ScheduledScreen() {
     try {
       const fetchedSchedules = await scheduleManager.getSchedulesForUser();
       
+      // Track which schedules need to be deleted from storage
+      const expiredScheduleIds: string[] = [];
+      
+      // Filter out completely expired schedules
+      const validSchedules = fetchedSchedules.filter(schedule => {
+        const now = new Date();
+        
+        // If there's an end date and it's in the past, the schedule has expired
+        if (schedule.scheduleConfig.endDate) {
+          const endDate = new Date(schedule.scheduleConfig.endDate);
+          if (endDate < now) {
+            console.log(`Schedule ${schedule.id} has expired based on end date`);
+            expiredScheduleIds.push(schedule.id);
+            return false;
+          }
+        }
+
+        // For one-time schedules (no days selected)
+        const hasSelectedDays = schedule.scheduleConfig.selectedDays.some(day => day === true);
+        if (!hasSelectedDays) {
+          // For one-time schedules, check if the end time has passed
+          const endTime = new Date(schedule.scheduleConfig.endTime);
+          const now = new Date();
+          
+          // If end time has passed, the schedule has expired - THIS IS THE KEY FIX
+          if (now > endTime) {
+            console.log(`Schedule ${schedule.id} has expired - one-time schedule with end time passed`);
+            expiredScheduleIds.push(schedule.id);
+            return false;
+          }
+        } else {
+          // For recurring schedules (days selected), check if all selected days for this week have passed
+          const now = new Date();
+          const currentDay = (now.getDay() + 6) % 7; // Convert to 0=Monday, 6=Sunday
+          const currentHour = now.getHours();
+          const currentMinute = now.getMinutes();
+          
+          // Check if there are any upcoming days in the current week
+          let hasUpcomingDay = false;
+          
+          // Check days after today in the current week
+          for (let i = currentDay + 1; i < 7; i++) {
+            if (schedule.scheduleConfig.selectedDays[i]) {
+              hasUpcomingDay = true;
+              break;
+            }
+          }
+          
+          // If today is selected, check if the end time has passed
+          if (!hasUpcomingDay && schedule.scheduleConfig.selectedDays[currentDay]) {
+            const endTime = new Date(schedule.scheduleConfig.endTime);
+            // If end time hasn't passed yet, we still have an upcoming schedule today
+            if (currentHour < endTime.getHours() || 
+                (currentHour === endTime.getHours() && currentMinute < endTime.getMinutes())) {
+              hasUpcomingDay = true;
+            }
+          }
+          
+          // If no upcoming days in this week, check if this is a weekly recurring schedule
+          // Weekly schedules should remain visible even if all days have passed for this week
+          // They'll become active again next week
+          if (!hasUpcomingDay) {
+            // Keep the schedule if it's a weekly recurring schedule
+            // We don't delete it because it will be active again next week
+            console.log(`Schedule ${schedule.id} has no upcoming days this week, but keeping as it's recurring`);
+          }
+        }
+        
+        return true;
+      });
+      
+      // Delete expired schedules from storage
+      if (expiredScheduleIds.length > 0) {
+        console.log(`Deleting ${expiredScheduleIds.length} expired schedules from storage`);
+        for (const scheduleId of expiredScheduleIds) {
+          try {
+            await scheduleManager.deleteSchedule(scheduleId);
+            console.log(`Deleted expired schedule ${scheduleId}`);
+          } catch (error) {
+            console.error(`Failed to delete expired schedule ${scheduleId}:`, error);
+          }
+        }
+      }
+      
       // Enhance schedules with app info and formatted strings
-      const enhancedSchedules: EnhancedScheduledLock[] = fetchedSchedules.map(schedule => {
+      const enhancedSchedules: EnhancedScheduledLock[] = validSchedules.map(schedule => {
         // Get app details for each package name
         const appsInfo = schedule.appPackageNames.map(packageName => {
           const appInfo = installedApps.find(app => app.packageName === packageName);
@@ -121,7 +218,28 @@ export default function ScheduledScreen() {
         const startTime = new Date(schedule.scheduleConfig.startTime);
         const endTime = new Date(schedule.scheduleConfig.endTime);
         const formattedTime = `${formatTime(startTime)} - ${formatTime(endTime)}`;
-        const formattedDays = formatDays(schedule.scheduleConfig.selectedDays);
+        
+        // Format the days with special handling for different cases
+        let formattedDays = '';
+        const selectedDays = schedule.scheduleConfig.selectedDays;
+        const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const selectedDayNames = selectedDays.map((selected, index) => selected ? dayNames[index] : null).filter(Boolean);
+        
+        if (selectedDayNames.length === 0) {
+          // Always display just "One-time" for simplicity and to avoid text overflow
+          formattedDays = 'One-time';
+        } else if (selectedDayNames.length === 7) {
+          formattedDays = 'Every day';
+        } else if (selectedDayNames.length === 5 && 
+                 selectedDays[0] && selectedDays[1] && selectedDays[2] && selectedDays[3] && selectedDays[4]) {
+          formattedDays = 'Weekdays';
+        } else if (selectedDayNames.length === 2 && selectedDays[5] && selectedDays[6]) {
+          formattedDays = 'Weekends';
+        } else if (selectedDayNames.length > 3) {
+          formattedDays = `Multiple days (${selectedDayNames.length})`;
+        } else {
+          formattedDays = selectedDayNames.join(', ');
+        }
         
         // Check if schedule is currently active
         const isActive = isScheduleActive(schedule);
@@ -142,17 +260,6 @@ export default function ScheduledScreen() {
       setLoading(false);
     }
   }, [installedApps]);
-
-  // Toggle schedule enabled status
-  const toggleSchedule = async (scheduleId: string, isEnabled: boolean) => {
-    try {
-      await scheduleManager.toggleSchedule(scheduleId, isEnabled);
-      // Refresh schedules after toggle
-      fetchSchedules();
-    } catch (error) {
-      console.error('Failed to toggle schedule:', error);
-    }
-  };
 
   // Refresh schedules when the screen comes into focus
   useFocusEffect(
@@ -209,12 +316,6 @@ export default function ScheduledScreen() {
             {item.isActive ? 'Active' : 'Inactive'}
           </Text>
         </View>
-        <Switch
-          value={item.isEnabled}
-          onValueChange={(value) => toggleSchedule(item.id, value)}
-          trackColor={{ false: '#D1D1D1', true: Colors.light.tint + '80' }}
-          thumbColor={item.isEnabled ? Colors.light.tint : '#F4F3F4'}
-        />
       </View>
       
       <View style={styles.scheduleContent}>
