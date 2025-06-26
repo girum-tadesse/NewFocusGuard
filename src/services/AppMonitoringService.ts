@@ -1,4 +1,5 @@
 import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
+import InsightsService from './InsightsService';
 
 interface AppMonitoringServiceInterface {
   startMonitoring(): Promise<void>;
@@ -17,6 +18,8 @@ class AppMonitoringService {
   private listeners: Map<string, () => void> = new Map();
   private lockedApps: Map<string, number | undefined> = new Map(); // packageName -> unlock time (or undefined for indefinite)
   private appBlockedSubscription: (() => void) | null = null;
+  private currentApp: { packageName: string; appName: string; startTime: number } | null = null;
+  private insightsService: InsightsService | null = null;
 
   private constructor() {
     console.log('[AppMonitoringService] Constructor called');
@@ -45,12 +48,80 @@ class AppMonitoringService {
     this.eventEmitter = new NativeEventEmitter(AppMonitoringModule);
     console.log('[AppMonitoringService] NativeEventEmitter initialized');
 
+    // Initialize insights service
+    this.insightsService = InsightsService.getInstance();
+    this.insightsService.initialize().catch(error => {
+      console.error('[AppMonitoringService] Failed to initialize InsightsService:', error);
+    });
+
     // Automatically subscribe to app blocked events when the service is instantiated
     this.appBlockedSubscription = this.addAppBlockedListener((event) => {
       // The primary action of showing the overlay is handled within addAppBlockedListener.
       // This callback is here if any additional JS-side logic is needed upon app block.
       console.log(`[AppMonitoringService] AppBlockedListener (internal subscription) received: ${event.packageName}`);
+      
+      // Record lock event in insights
+      if (this.insightsService) {
+        const startTime = Date.now();
+        // We don't know the end time yet, so we'll use the same time
+        // This will be updated when the app changes or when the lock is bypassed
+        this.insightsService.recordLockEvent(
+          event.packageName, // Using packageName as appName for now
+          event.packageName,
+          startTime,
+          startTime,
+          true // Assume successful by default
+        ).catch(error => {
+          console.error('[AppMonitoringService] Failed to record lock event:', error);
+        });
+      }
     });
+
+    // Add app change listener to track app usage
+    this.addAppChangeListener(this.handleAppChange.bind(this));
+  }
+
+  private handleAppChange(packageName: string): void {
+    console.log(`[AppMonitoringService] App changed to: ${packageName}`);
+    
+    const now = Date.now();
+    
+    // If we have a previous app, record its usage
+    if (this.currentApp && this.insightsService) {
+      const duration = now - this.currentApp.startTime;
+      console.log(`[AppMonitoringService] Recording usage for ${this.currentApp.packageName} (${duration}ms)`);
+      
+      this.insightsService.recordAppUsage(
+        this.currentApp.packageName,
+        this.currentApp.appName || this.currentApp.packageName,
+        duration
+      ).catch(error => {
+        console.error('[AppMonitoringService] Failed to record app usage:', error);
+      });
+      
+      // If the previous app was locked and we're switching away from it,
+      // record a successful lock event (user respected the lock)
+      if (this.lockedApps.has(this.currentApp.packageName)) {
+        this.insightsService.recordLockEvent(
+          this.currentApp.appName || this.currentApp.packageName,
+          this.currentApp.packageName,
+          this.currentApp.startTime,
+          now,
+          true // Lock was successful as user switched away
+        ).catch(error => {
+          console.error('[AppMonitoringService] Failed to record lock event:', error);
+        });
+      }
+    }
+    
+    // Update current app
+    this.currentApp = {
+      packageName,
+      appName: packageName, // We don't have the app name yet, using package name as fallback
+      startTime: now
+    };
+    
+    // If this app is locked, we'll get an onAppBlocked event later
   }
 
   public static getInstance(): AppMonitoringService {
@@ -75,8 +146,11 @@ class AppMonitoringService {
       this.isRunning = true;
       console.log('[AppMonitoringService] Monitoring started successfully. isRunning set to true.');
     } catch (error) {
-      console.error('Failed to start monitoring:', error);
-      throw error;
+      // Don't throw error - gracefully handle and log it
+      console.error('Failed to start monitoring, but continuing app execution:', error);
+      // Don't rethrow the error to prevent app from crashing or freezing
+      // Just consider monitoring as not running
+      this.isRunning = false;
     }
   }
 
@@ -92,6 +166,22 @@ class AppMonitoringService {
       await NativeModules.AppMonitoringModule.stopMonitoring();
       this.isRunning = false;
       console.log('[AppMonitoringService] Monitoring stopped successfully. isRunning set to false.');
+      
+      // Record final app usage when monitoring stops
+      if (this.currentApp && this.insightsService) {
+        const now = Date.now();
+        const duration = now - this.currentApp.startTime;
+        
+        this.insightsService.recordAppUsage(
+          this.currentApp.packageName,
+          this.currentApp.appName || this.currentApp.packageName,
+          duration
+        ).catch(error => {
+          console.error('[AppMonitoringService] Failed to record final app usage:', error);
+        });
+        
+        this.currentApp = null;
+      }
     } catch (error) {
       console.error('Failed to stop monitoring:', error);
       throw error;

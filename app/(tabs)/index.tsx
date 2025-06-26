@@ -64,7 +64,7 @@ export default function AppsScreen() {
   const [scheduledLocks, setScheduledLocks] = useState<ScheduledLock[]>([]);
 
   useEffect(() => {
-    checkAndRequestPermissions();
+    // Removed the automatic permission check at startup
     loadApps();
     loadSchedules(); // Load schedules on initial component mount
   }, []);
@@ -114,115 +114,6 @@ export default function AppsScreen() {
     }
   };
 
-  const checkAndRequestPermissions = async () => {
-    console.log("[Permissions] Starting permission setup flow");
-  
-    try {
-      // First, check if permissions are already granted.
-      const overlayGranted = await checkOverlayPermission();
-      // Note: hasUsageStatsPermission is now async, so we await it.
-      const usageGranted = await AppMonitoringModule.hasUsageStatsPermission();
-  
-      if (overlayGranted && usageGranted) {
-        console.log("[Permissions] All permissions are already granted.");
-        return; // All permissions are in place, no need to ask.
-      }
-  
-      // Use a promise to wait for the user to interact with the initial alert.
-      const userAgreed = await new Promise(resolve => {
-      Alert.alert(
-        "Welcome to FocusGuard!",
-          "To help you stay focused, we need two permissions. We'll guide you through setting them up step by step.",
-        [
-            { text: "Let's Start", onPress: () => resolve(true) },
-            { text: "Maybe Later", style: "cancel", onPress: () => resolve(false) },
-          ],
-          { cancelable: false }
-        );
-      });
-  
-      if (!userAgreed) {
-        console.log("[Permissions] User declined the permission setup flow.");
-        Alert.alert(
-          "Permissions Required",
-          "Please note that FocusGuard requires these permissions to function correctly. You can grant them later from the settings."
-        );
-        return;
-      }
-  
-      // --- Step 1: Overlay Permission ---
-      if (!overlayGranted) {
-        console.log("[Permissions] Requesting Overlay permission.");
-        // Use a promise to wait for the user to proceed after the explanation.
-        await new Promise<void>(resolve => {
-                  Alert.alert(
-                    "Step 1 of 2: Display Over Other Apps",
-            "This permission is needed to show the lock screen over other applications when a timer is up.",
-                    [
-                      {
-                        text: "Open Settings",
-                        onPress: async () => {
-                            await requestOverlayPermission();
-                  // We resolve here to move to the next step. We can't know if the user
-                  // granted it, but we've guided them. We'll check again if needed.
-                  resolve();
-                },
-              },
-                    ],
-                    { cancelable: false }
-          );
-        });
-      }
-  
-      // --- Brief transition for better UX ---
-      await new Promise<void>(resolve => {
-        Alert.alert(
-          "Great!",
-          "Now for the final permission.",
-          [{ text: "Continue", onPress: () => resolve() }]
-                  );
-                });
-
-      // --- Step 2: Usage Stats Permission ---
-      // Re-check usage stats in case it was granted in a previous session
-      const usageGrantedAfterOverlay = await AppMonitoringModule.hasUsageStatsPermission();
-      if (!usageGrantedAfterOverlay) {
-        console.log("[Permissions] Requesting Usage Stats permission.");
-        await new Promise<void>(resolve => {
-                  Alert.alert(
-                    "Step 2 of 2: Usage Access",
-            "This permission allows FocusGuard to see which app is currently running to know when to lock it.",
-                    [
-                      {
-                        text: "Open Settings",
-                        onPress: async () => {
-                            await AppMonitoringModule.requestUsageStatsPermission();
-                  // As before, we resolve to signal completion of this step.
-                  resolve();
-                },
-              },
-                    ],
-                    { cancelable: false }
-                  );
-                });
-      }
-  
-      // --- Final Confirmation ---
-                Alert.alert(
-        "Setup Complete!",
-        "Thank you! FocusGuard is now ready to help you stay focused. You can always manage permissions in your phone's settings.",
-        [{ text: "Got it!" }]
-                );
-  
-    } catch (error) {
-      console.error('[Permissions] Error during permission setup flow:', error);
-      Alert.alert(
-        "Setup Error",
-        "An unexpected error occurred during permission setup. Please try again or contact support if the problem persists."
-      );
-    }
-  };
-
   const loadApps = async () => {
     try {
       setIsLoadingApps(true);
@@ -255,6 +146,97 @@ export default function AppsScreen() {
     });
   };
 
+  // Simplify the permission handling flow to ensure both permissions are requested in sequence
+  const requestPermissions = async (onComplete: () => void) => {
+    try {
+      // First check usage stats permission
+      const hasUsagePermission = await AppMonitoringModule.hasUsageStatsPermission();
+      
+      if (!hasUsagePermission) {
+        // Show alert for usage stats permission
+        Alert.alert(
+          "Usage Access Permission Required",
+          "FocusGuard needs to know which apps are running. Please grant the 'Usage Access' permission.",
+          [
+            {
+              text: "Grant Permission",
+              onPress: async () => {
+                // Request usage stats permission
+                await AppMonitoringModule.requestUsageStatsPermission();
+                
+                // After returning, explicitly request overlay permission
+                setTimeout(() => {
+                  requestOverlayPermissionExplicitly(onComplete);
+                }, 500);
+              }
+            },
+            { text: "Cancel", style: "cancel" }
+          ],
+          { cancelable: false }
+        );
+      } else {
+        // Usage permission already granted, check overlay permission
+        requestOverlayPermissionExplicitly(onComplete);
+      }
+    } catch (error) {
+      console.error('Error requesting permissions:', error);
+      Alert.alert(
+        "Error",
+        "There was an error requesting permissions. Please try again.",
+        [{ text: "OK" }]
+      );
+    }
+  };
+  
+  // Function to explicitly request overlay permission
+  const requestOverlayPermissionExplicitly = async (onComplete: () => void) => {
+    const hasOverlayPermission = await checkOverlayPermission();
+    
+    if (!hasOverlayPermission) {
+      Alert.alert(
+        "Display Over Other Apps Permission Required",
+        "FocusGuard needs to show a lock screen over locked apps. Please grant the 'Display Over Other Apps' permission.",
+        [
+          {
+            text: "Grant Permission",
+            onPress: async () => {
+              await requestOverlayPermission();
+              
+              // After returning, verify both permissions
+              setTimeout(async () => {
+                const finalUsagePermission = await AppMonitoringModule.hasUsageStatsPermission();
+                const finalOverlayPermission = await checkOverlayPermission();
+                
+                if (finalUsagePermission && finalOverlayPermission) {
+                  // Both permissions granted, proceed
+                  onComplete();
+                } else {
+                  // Still missing permissions
+                  Alert.alert(
+                    "Permissions Required",
+                    "Both permissions are needed for the app to function properly. Please try again when ready.",
+                    [{ text: "OK" }]
+                  );
+                }
+              }, 500);
+            }
+          },
+          { text: "Cancel", style: "cancel" }
+        ],
+        { cancelable: false }
+      );
+    } else {
+      // Both permissions are granted
+      const finalUsagePermission = await AppMonitoringModule.hasUsageStatsPermission();
+      if (finalUsagePermission) {
+        onComplete();
+      } else {
+        // This should rarely happen - usage permission was lost somehow
+        requestPermissions(onComplete);
+      }
+    }
+  };
+
   const handleLockNow = async (app: DisplayAppInfo, duration?: number) => {
     try {
       // If no apps are selected, show alert
@@ -266,27 +248,10 @@ export default function AppsScreen() {
       // Check permissions before locking
       const hasUsagePermission = await AppMonitoringModule.hasUsageStatsPermission();
       const hasOverlayPermission = await checkOverlayPermission();
+      
       if (!hasUsagePermission || !hasOverlayPermission) {
-        Alert.alert(
-          "Permissions Required",
-          "You must grant Usage Access and Display Over Other Apps permissions to use the lock feature.",
-          [
-            {
-              text: "Grant Usage Access",
-              onPress: async () => {
-                await AppMonitoringModule.requestUsageStatsPermission();
-              }
-            },
-            {
-              text: "Grant Overlay Permission",
-              onPress: async () => {
-                await requestOverlayPermission();
-              }
-            },
-            { text: "Cancel", style: "cancel" }
-          ],
-          { cancelable: false }
-        );
+        // Use the new permission request flow
+        requestPermissions(() => handleLockNow(app, duration));
         return;
       }
 
@@ -309,11 +274,22 @@ export default function AppsScreen() {
     }
   };
 
-  const handleOpenScheduleModal = () => {
+  const handleOpenScheduleModal = async () => {
     if (selectedAppsUI.size === 0) {
       Alert.alert("No Apps Selected", "Please select at least one app to schedule.");
       return;
     }
+    
+    // Check permissions before scheduling
+    const hasUsagePermission = await AppMonitoringModule.hasUsageStatsPermission();
+    const hasOverlayPermission = await checkOverlayPermission();
+    
+    if (!hasUsagePermission || !hasOverlayPermission) {
+      // Use the new permission request flow
+      requestPermissions(() => setIsScheduleModalVisible(true));
+      return;
+    }
+    
     setIsScheduleModalVisible(true);
   };
 
@@ -346,11 +322,22 @@ export default function AppsScreen() {
     }
   };
 
-  const handleOpenLockNowModal = () => {
+  const handleOpenLockNowModal = async () => {
     if (selectedAppsUI.size === 0) {
       Alert.alert("No Apps Selected", "Please select at least one app to lock.");
       return;
     }
+    
+    // Check permissions before showing lock duration modal
+    const hasUsagePermission = await AppMonitoringModule.hasUsageStatsPermission();
+    const hasOverlayPermission = await checkOverlayPermission();
+    
+    if (!hasUsagePermission || !hasOverlayPermission) {
+      // Use the new permission request flow
+      requestPermissions(() => setIsLockDurationModalVisible(true));
+      return;
+    }
+    
     setIsLockDurationModalVisible(true);
   };
 
@@ -401,11 +388,23 @@ export default function AppsScreen() {
       </ThemedView>
 
       <View style={styles.floatingContainer}>
-        <TouchableOpacity style={styles.floatingButton} onPress={handleOpenScheduleModal}>
+        <TouchableOpacity 
+          style={styles.floatingButton} 
+          onPress={() => handleOpenScheduleModal().catch(error => {
+            console.error('Error in schedule modal permission check:', error);
+            Alert.alert("Error", "Failed to open schedule modal. Please try again.");
+          })}
+        >
           <MaterialIcons name="schedule" size={16} color="#FFFFFF" />
           <ThemedText style={styles.floatingButtonText}>SCHEDULE</ThemedText>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.floatingButton} onPress={handleOpenLockNowModal}>
+        <TouchableOpacity 
+          style={styles.floatingButton} 
+          onPress={() => handleOpenLockNowModal().catch(error => {
+            console.error('Error in lock now modal permission check:', error);
+            Alert.alert("Error", "Failed to open lock modal. Please try again.");
+          })}
+        >
           <MaterialIcons name="lock" size={16} color="#FFFFFF" />
           <ThemedText style={styles.floatingButtonText}>LOCK NOW</ThemedText>
         </TouchableOpacity>

@@ -69,26 +69,7 @@ export default function SettingsScreen() {
     );
   };
 
-  const handleUploadMotivationalContent = () => {
-    Alert.alert(
-      "Upload Content",
-      "Choose what type of motivational content you'd like to upload",
-      [
-        {
-          text: "Upload Image",
-          onPress: () => Alert.alert("Coming Soon", "Image upload functionality will be available soon.")
-        },
-        {
-          text: "Add Custom Quote",
-          onPress: () => setIsAddQuoteModalVisible(true)
-        },
-        {
-          text: "Cancel",
-          style: "cancel"
-        }
-      ]
-    );
-  };
+
   
   const handleAddQuote = async (text: string, author?: string) => {
     try {
@@ -196,12 +177,12 @@ export default function SettingsScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={[styles.headerTitle, {color: '#00C853'}]}>Settings</Text>
       </View>
 
       {/* User Account Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>User Account</Text>
+        <Text style={[styles.sectionTitle, {color: '#00C853'}]}>User Account</Text>
         
         <View style={styles.profileContainer}>
           <View style={styles.avatarContainer}>
@@ -249,7 +230,7 @@ export default function SettingsScreen() {
 
       {/* Motivation Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Motivation</Text>
+        <Text style={[styles.sectionTitle, {color: '#00C853'}]}>Motivation</Text>
         
         <View style={styles.optionsContainer}>
           <TouchableOpacity 
@@ -275,14 +256,7 @@ export default function SettingsScreen() {
             <Ionicons name="chevron-forward" size={20} color="#999" />
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={handleUploadMotivationalContent}
-          >
-            <Ionicons name="cloud-upload-outline" size={24} color={Colors.light.tint} />
-            <Text style={styles.optionText}>Upload Motivational Content</Text>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
-          </TouchableOpacity>
+
 
           <View style={styles.optionItem}>
             <Ionicons name="stats-chart-outline" size={24} color={Colors.light.tint} />
@@ -308,7 +282,7 @@ export default function SettingsScreen() {
 
       {/* App Preferences Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>App Preferences</Text>
+        <Text style={[styles.sectionTitle, {color: '#00C853'}]}>App Preferences</Text>
         
         <View style={styles.optionsContainer}>
           <View style={styles.optionItem}>
@@ -344,7 +318,7 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Lock Settings</Text>
+        <Text style={[styles.sectionTitle, {color: '#00C853'}]}>Lock Settings</Text>
         
         <View style={styles.optionsContainer}>
           <View style={styles.optionItem}>
@@ -358,30 +332,12 @@ export default function SettingsScreen() {
             />
           </View>
           
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={() => Alert.alert("Default Lock Duration", "Choose a default lock duration for quick locks. This will be used when you don't specify a custom duration.\n\nThis feature will be available in a future update.")}
-          >
-            <Ionicons name="time-outline" size={24} color={Colors.light.tint} />
-            <Text style={styles.optionText}>Default Lock Duration</Text>
-            <Text style={styles.optionValue}>30 min</Text>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.optionItem}
-            onPress={() => Alert.alert("Screen Lock Overlay", "Choose the type of overlay to show when an app is locked. Options include full block, motivational quotes, or productivity stats.\n\nThis feature will be available in a future update.")}
-          >
-            <Ionicons name="layers-outline" size={24} color={Colors.light.tint} />
-            <Text style={styles.optionText}>Lock Screen Style</Text>
-            <Text style={styles.optionValue}>Default</Text>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
-          </TouchableOpacity>
+
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Support & Feedback</Text>
+        <Text style={[styles.sectionTitle, {color: '#00C853'}]}>Support & Feedback</Text>
         
         <View style={styles.optionsContainer}>
           <TouchableOpacity 
@@ -414,7 +370,7 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>About</Text>
+        <Text style={[styles.sectionTitle, {color: '#00C853'}]}>About</Text>
         
         <View style={styles.aboutContainer}>
           <View style={styles.appIconContainer}>
@@ -502,7 +458,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 15,
-    color: '#333',
+    color: '#00C853', // Changed to a brighter green color that should be more visible
   },
   profileContainer: {
     flexDirection: 'row',

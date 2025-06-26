@@ -46,13 +46,8 @@ public class AppMonitoringModule extends ReactContextBaseJavaModule {
     @ReactMethod
     public void startMonitoring(Promise promise) {
         try {
-            // Check for usage stats permission
-            if (!hasUsageStatsPermission()) {
-                // Open usage access settings if permission not granted
-                requestUsageStatsPermission(promise);
-                return;
-            }
-
+            // No longer auto-check for permission. The app will request permissions
+            // only when the user tries to lock or schedule an app
             reactContext.startService(serviceIntent);
             promise.resolve(null);
         } catch (Exception e) {
@@ -142,6 +137,31 @@ public class AppMonitoringModule extends ReactContextBaseJavaModule {
         } catch (Exception e) {
             Log.e(TAG, "Error sending SET_SCHEDULES intent.", e);
             promise.reject("SCHEDULE_ERROR", e.getMessage(), e);
+        }
+    }
+
+    @ReactMethod
+    public void openAppSettings(Promise promise) {
+        Log.d(TAG, "Native: openAppSettings called. Opening app info settings.");
+        try {
+            Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(android.net.Uri.parse("package:" + reactContext.getPackageName()));
+            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            reactContext.startActivity(intent);
+            promise.resolve(null);
+        } catch (Exception e) {
+            promise.reject("SETTINGS_ERROR", e.getMessage(), e);
+        }
+    }
+
+    @ReactMethod
+    public void getAppPackageName(Promise promise) {
+        try {
+            String packageName = reactContext.getPackageName();
+            Log.d(TAG, "Native: getAppPackageName: " + packageName);
+            promise.resolve(packageName);
+        } catch (Exception e) {
+            promise.reject("PACKAGE_ERROR", e.getMessage(), e);
         }
     }
 

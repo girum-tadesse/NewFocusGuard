@@ -18,7 +18,6 @@ import expo.modules.ReactNativeHostWrapper
 
 // Import our custom packages
 import com.newfocusguard.AppMonitoringPackage
-import com.newfocusguard.AppIconPackage
 import com.newfocusguard.OverlayPermissionPackage
 import com.newfocusguard.InstalledAppsPackage
 import com.newfocusguard.OverlayPackage
@@ -31,7 +30,6 @@ class MainApplication : Application(), ReactApplication {
           override fun getPackages(): List<ReactPackage> {
             val packages = PackageList(this).packages
             // Add our custom packages
-            packages.add(AppIconPackage())
             packages.add(OverlayPermissionPackage())
             packages.add(AppMonitoringPackage())
             packages.add(InstalledAppsPackage())

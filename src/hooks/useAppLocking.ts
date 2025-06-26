@@ -32,9 +32,8 @@ export const useAppLocking = () => {
   }, []);
 
   const setupMonitoring = async () => {
-    // The native startMonitoring method will internally check and prompt for
-    // permissions if they are not already granted.
-    monitoringService.startMonitoring();
+    // We no longer automatically start monitoring when the component mounts
+    // The monitoring will be started when the user attempts to lock or schedule an app
   };
 
   const loadLockedApps = async () => {
