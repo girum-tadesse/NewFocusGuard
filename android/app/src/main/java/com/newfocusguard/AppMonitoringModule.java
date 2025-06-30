@@ -6,6 +6,7 @@ import android.app.AppOpsManager;
 import android.content.Context;
 import android.os.Process;
 import android.util.Log;
+import android.net.Uri;
 
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -117,6 +118,7 @@ public class AppMonitoringModule extends ReactContextBaseJavaModule {
         Log.d(TAG, "Native: requestUsageStatsPermission called. Opening settings.");
         try {
             Intent intent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS);
+            intent.setData(Uri.parse("package:" + reactContext.getPackageName()));
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             reactContext.startActivity(intent);
             promise.resolve(null);

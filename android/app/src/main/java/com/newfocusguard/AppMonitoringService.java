@@ -36,6 +36,7 @@ import androidx.core.app.NotificationCompat;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.HeadlessJsTaskService;
+import com.facebook.react.modules.core.DeviceEventManagerModule;
 
 import org.json.JSONObject;
 import org.json.JSONArray;
@@ -65,6 +66,7 @@ public class AppMonitoringService extends Service {
     private Handler handler;
     private boolean isRunning = false;
     private String lastForegroundApp = "";
+    private long lastAppChangeTime = 0;
     private UsageStatsManager usageStatsManager;
     private Map<String, Long> lockedApps = new HashMap<>();
     private List<ScheduledLock> scheduledLocks = new ArrayList<>();
@@ -206,6 +208,13 @@ public class AppMonitoringService extends Service {
         if (handler != null) {
             handler.removeCallbacksAndMessages(null);
         }
+        // When stopping, record the final app usage
+        if (!lastForegroundApp.isEmpty() && lastAppChangeTime > 0) {
+            long duration = System.currentTimeMillis() - lastAppChangeTime;
+            if (duration > CHECK_INTERVAL_MS) { // Only record if it's significant
+                sendAppChangeEvent(lastForegroundApp, duration);
+            }
+        }
         hideNativeOverlay();
         stopForeground(true);
         Log.d(TAG, "stopForeground(true) called.");
@@ -267,31 +276,23 @@ public class AppMonitoringService extends Service {
             public void run() {
                 if (!isRunning) return;
 
-                checkScheduledLocks();
-                checkExpiredLocks();
-
-                String currentApp = getCurrentForegroundApp();
-                if (currentApp != null && !currentApp.equals(lastForegroundApp)) {
-                    Log.d(TAG, "Foreground app changed from: " + lastForegroundApp + " to: " + currentApp);
-                    lastForegroundApp = currentApp;
-
-                    if (currentlyOverlayingPackage != null && !currentlyOverlayingPackage.equals(currentApp)) {
-                        hideNativeOverlay();
+                String foregroundApp = getCurrentForegroundApp();
+                
+                if (foregroundApp != null && !foregroundApp.equals(lastForegroundApp)) {
+                    Log.d(TAG, "App changed from " + lastForegroundApp + " to " + foregroundApp);
+                    if (!lastForegroundApp.isEmpty() && lastAppChangeTime > 0) {
+                        long duration = System.currentTimeMillis() - lastAppChangeTime;
+                        // Only send event for significant usage time
+                        if (duration > CHECK_INTERVAL_MS) { 
+                           sendAppChangeEvent(lastForegroundApp, duration);
                     }
-                    
-                    if (isAppLocked(currentApp)) {
-                        showNativeOverlay(currentApp);
-                        sendAppBlockedEvent(currentApp);
-                    } else {
-                        if (currentlyOverlayingPackage != null && currentlyOverlayingPackage.equals(currentApp)) {
-                           hideNativeOverlay();
-                        }
-                        sendAppChangeEvent(currentApp);
                     }
-                } else if (currentApp != null && isAppLocked(currentApp) && overlayView == null) {
-                    showNativeOverlay(currentApp);
-                    sendAppBlockedEvent(currentApp);
+                    lastForegroundApp = foregroundApp;
+                    lastAppChangeTime = System.currentTimeMillis();
                 }
+
+                checkExpiredLocks();
+                checkScheduledLocks();
 
                 if (isRunning && handler != null) {
                     handler.postDelayed(this, CHECK_INTERVAL_MS);
@@ -354,8 +355,11 @@ public class AppMonitoringService extends Service {
         return currentApp;
     }
 
-    private void sendAppChangeEvent(String packageName) {
-        sendEvent("onAppChange", packageName);
+    private void sendAppChangeEvent(String packageName, long durationMs) {
+        WritableMap params = Arguments.createMap();
+        params.putString("packageName", packageName);
+        params.putDouble("durationMs", durationMs);
+        sendEvent("onAppChange", params);
     }
 
     private void sendAppBlockedEvent(String packageName) {
@@ -365,20 +369,22 @@ public class AppMonitoringService extends Service {
     private void sendEvent(String eventName, String packageName) {
         WritableMap params = Arguments.createMap();
         params.putString("packageName", packageName);
-        params.putString("eventType", eventName);
+        sendEvent(eventName, params);
+    }
 
-        String headlessTaskKey = "AppBlocked";
-        Bundle bundle = Arguments.toBundle(params);
-        if (bundle == null) bundle = new Bundle();
-        bundle.putString("taskName", headlessTaskKey);
-
-        Intent serviceIntent = new Intent(getApplicationContext(), FocusGuardHeadlessTaskService.class);
-        serviceIntent.putExtras(bundle);
-        
+    private void sendEvent(String eventName, WritableMap params) {
         try {
-            getApplicationContext().startService(serviceIntent);
+            ReactNativeHost reactNativeHost = ((ReactApplication) getApplication()).getReactNativeHost();
+            if (reactNativeHost.hasInstance()) {
+                reactNativeHost.getReactInstanceManager().getCurrentReactContext()
+                    .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class)
+                    .emit(eventName, params);
+                Log.d(TAG, "Sent event " + eventName + " with params: " + params.toString());
+            } else {
+                Log.w(TAG, "Cannot send event, no React instance running.");
+            }
         } catch (Exception e) {
-            Log.e(TAG, "Failed to start FocusGuardHeadlessTaskService for " + headlessTaskKey, e);
+            Log.e(TAG, "Exception while sending event " + eventName, e);
         }
     }
 

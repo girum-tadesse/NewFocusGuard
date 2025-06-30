@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "98798161418-8sei49g6gg849k7krospqiohs7ljrc11.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.newfocusguard",
+            "certificate_hash": "0e6a92edc7865cb0fbf28c8ea06cedb8adc252e0"
+          }
+        },
+        {
           "client_id": "98798161418-njqgs67r5rlia087b52909pvreav1nff.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
