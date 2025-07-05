@@ -285,10 +285,30 @@ public class AppMonitoringService extends Service {
                         // Only send event for significant usage time
                         if (duration > CHECK_INTERVAL_MS) { 
                            sendAppChangeEvent(lastForegroundApp, duration);
+                        }
                     }
+                    
+                    // Hide overlay if we're showing it for the previous app
+                    if (currentlyOverlayingPackage != null) {
+                        hideNativeOverlay();
                     }
+                    
                     lastForegroundApp = foregroundApp;
                     lastAppChangeTime = System.currentTimeMillis();
+                    
+                    // Check if the new foreground app is locked
+                    if (isAppLocked(foregroundApp)) {
+                        Log.d(TAG, "Showing overlay for locked app: " + foregroundApp);
+                        showNativeOverlay(foregroundApp);
+                        currentlyOverlayingPackage = foregroundApp;
+                        sendAppBlockedEvent(foregroundApp);
+                    }
+                } else if (foregroundApp != null && currentlyOverlayingPackage == null && isAppLocked(foregroundApp)) {
+                    // This handles the case where the app was already in foreground when it got locked
+                    Log.d(TAG, "Showing overlay for already-foreground locked app: " + foregroundApp);
+                    showNativeOverlay(foregroundApp);
+                    currentlyOverlayingPackage = foregroundApp;
+                    sendAppBlockedEvent(foregroundApp);
                 }
 
                 checkExpiredLocks();
